@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "metrolens-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-26",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "WMATA_API_BASE_URL": "https://api.wmata.com"
+  }
+}

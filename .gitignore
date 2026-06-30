@@ -1,0 +1,23 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Native build output and generated projects
+ios/
+android/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Credentials
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# OS and editor files
+.DS_Store
+*.swp
