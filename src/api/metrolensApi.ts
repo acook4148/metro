@@ -67,7 +67,7 @@ type IncidentsResponse = {
   fetchedAt: string;
 };
 
-const apiBaseUrl =
+export const metrolensApiBaseUrl =
   Constants.expoConfig?.extra?.apiBaseUrl ||
   process.env.EXPO_PUBLIC_API_BASE_URL ||
   'http://localhost:8787';
@@ -82,7 +82,7 @@ export const metrolensApi = {
 };
 
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await fetch(`${metrolensApiBaseUrl}${path}`, {
     headers: {
       Accept: 'application/json',
     },

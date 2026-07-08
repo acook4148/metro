@@ -16,10 +16,10 @@ Each checkbox is intended to be small enough for one prompt or one user action.
 
 - [x] Create the React Native TypeScript app project.
 - [x] Choose Expo prebuild/custom dev client or bare React Native.
-- [ ] Add the iOS WidgetKit extension.
+- [x] Add the iOS WidgetKit extension.
 - [ ] Add the Android App Widget provider.
 - [ ] Add the iOS Live Activity extension if it is included in the first build.
-- [ ] Configure the iOS App Group entitlement for app-widget shared storage.
+- [x] Configure the iOS App Group entitlement for app-widget shared storage.
 - [ ] Configure Android shared storage for widget snapshots.
 - [x] Add app environments for development, staging, and production.
 - [ ] Add navigation and shared app shell dependencies.
@@ -62,13 +62,13 @@ Each checkbox is intended to be small enough for one prompt or one user action.
 
 ## Widgets
 
-- [ ] Build the small favorite station home screen widget.
-- [ ] Build the medium station or commute widget.
+- [x] Build the small favorite station home screen widget.
+- [x] Build the medium station or commute widget.
 - [ ] Build iOS lock screen widgets for next train and line status.
 - [ ] Build Android home screen widgets for favorite station and commute status.
 - [ ] Add iOS App Intent widget configuration for station selection.
 - [ ] Add Android widget configuration for station selection.
-- [ ] Write widget snapshots from the main app into shared storage.
+- [x] Write widget snapshots from the main app into shared storage.
 - [ ] Add widget states for no favorite, stale data, and provider outage.
 - [ ] Add widget deep links into the app.
 

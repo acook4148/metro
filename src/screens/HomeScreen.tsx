@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  metrolensApiBaseUrl,
   metrolensApi,
   MetroStation,
   ServiceIncident,
@@ -25,6 +28,10 @@ import {
   readStationUsage,
   StationUsageSnapshot,
 } from '../storage/stationUsageStore';
+import {
+  createStationWidgetPredictions,
+  writeStationWidgetSnapshot,
+} from '../storage/widgetSnapshotStore';
 import { colors, lineColors, shadow } from '../theme';
 
 const DEFAULT_STATION_CODE = 'A01';
@@ -55,6 +62,7 @@ export function HomeScreen() {
   const [stationUsage, setStationUsage] = useState<StationUsageSnapshot>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const stationGroups = useMemo(() => groupStations(stations), [stations]);
@@ -127,11 +135,30 @@ export function HomeScreen() {
       const predictionsResponses = await Promise.all(
         resolvedStationCodes.map((stationCode) => metrolensApi.getPredictions(stationCode)),
       );
+      const resolvedStationGroups = groupStations(stationsResponse.stations);
+      const resolvedStation = resolvedStationGroups.find((station) =>
+        station.stationCodes.includes(resolvedStationCodes[0]),
+      );
+      const nextPredictions = predictionsResponses.flatMap((response) => response.predictions);
+      const nextUpdatedAt = getLatestFetchedAt(predictionsResponses.map((response) => response.fetchedAt));
 
       setStations(stationsResponse.stations);
       setIncidents(incidentsResponse.incidents);
-      setPredictions(predictionsResponses.flatMap((response) => response.predictions));
-      setUpdatedAt(getLatestFetchedAt(predictionsResponses.map((response) => response.fetchedAt)));
+      setPredictions(nextPredictions);
+      setUpdatedAt(nextUpdatedAt);
+
+      if (resolvedStation) {
+        writeStationWidgetSnapshot({
+          stationCode: resolvedStation.code,
+          stationCodes: resolvedStation.stationCodes,
+          stationName: resolvedStation.name,
+          lines: resolvedStation.lines,
+          predictions: createStationWidgetPredictions(nextPredictions),
+          alertCount: incidentsResponse.incidents.length,
+          fetchedAt: nextUpdatedAt,
+          generatedAt: new Date().toISOString(),
+        });
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load Metro data');
     } finally {
@@ -161,6 +188,7 @@ export function HomeScreen() {
   }, [loadHome]);
 
   function selectStation(station: StationGroup) {
+    Keyboard.dismiss();
     setSelectedStationCode(station.code);
     setQuery('');
     loadHome(station.stationCodes);
@@ -198,8 +226,10 @@ export function HomeScreen() {
             autoCorrect={false}
             clearButtonMode="while-editing"
             onChangeText={setQuery}
+            onSubmitEditing={Keyboard.dismiss}
             placeholder="Search station or line"
             placeholderTextColor={colors.inkSubtle}
+            returnKeyType="search"
             style={styles.searchInput}
             value={query}
           />
@@ -275,7 +305,7 @@ export function HomeScreen() {
             <View style={styles.errorBox}>
               <Text style={styles.errorTitle}>Metro data is not connected</Text>
               <Text style={styles.errorCopy}>{error}</Text>
-              <Text style={styles.errorHint}>Start the local API proxy, then pull down to refresh.</Text>
+              <Text style={styles.errorHint}>{getApiErrorHint()}</Text>
             </View>
           ) : null}
 
@@ -321,7 +351,12 @@ export function HomeScreen() {
           ) : null}
         </View>
 
-        <View style={styles.statusCard}>
+        <Pressable
+          accessibilityRole={incidents.length > 0 ? 'button' : undefined}
+          disabled={incidents.length === 0}
+          onPress={() => setIsAlertModalVisible(true)}
+          style={({ pressed }) => [styles.statusCard, incidents.length > 0 && pressed && styles.pressed]}
+        >
           <View>
             <Text style={styles.cardKicker}>Service snapshot</Text>
             <Text style={styles.statusTitle}>
@@ -344,8 +379,69 @@ export function HomeScreen() {
               {incidents[0].description}
             </Text>
           ) : null}
-        </View>
+        </Pressable>
       </ScrollView>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsAlertModalVisible(false)}
+        transparent
+        visible={isAlertModalVisible}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            accessibilityLabel="Close service alerts"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setIsAlertModalVisible(false)}
+          />
+          <View style={styles.alertModal}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleGroup}>
+                <Text style={styles.modalKicker}>Service alerts</Text>
+                <Text style={styles.modalTitle}>{incidents.length} active rail alerts</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setIsAlertModalVisible(false)}
+                style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.modalCloseText}>Close</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator
+            >
+              {incidents.map((incident, index) => (
+                <View
+                  key={incident.id || `${incident.updatedAt}-${index}`}
+                  style={[styles.alertDetail, index > 0 && styles.alertDetailDivider]}
+                >
+                  <View style={styles.alertDetailHeader}>
+                    <Text style={styles.alertDetailType}>{incident.type || 'Rail alert'}</Text>
+                    {incident.updatedAt ? (
+                      <Text style={styles.alertDetailDate}>
+                        {new Date(incident.updatedAt).toLocaleTimeString()}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {incident.linesAffected.length > 0 ? (
+                    <View style={styles.alertDetailLines}>
+                      {incident.linesAffected.map((line) => (
+                        <LineBadge code={line} compact key={`${incident.id || index}-${line}`} />
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <Text style={styles.alertDetailDescription}>{incident.description}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -470,6 +566,14 @@ function getLatestFetchedAt(fetchedAtValues: string[]): string | null {
 
   const latestTime = Math.max(...fetchedAtValues.map((fetchedAt) => new Date(fetchedAt).getTime()));
   return Number.isFinite(latestTime) ? new Date(latestTime).toISOString() : fetchedAtValues[0];
+}
+
+function getApiErrorHint(): string {
+  if (metrolensApiBaseUrl.includes('localhost') || metrolensApiBaseUrl.includes('127.0.0.1')) {
+    return 'Start the local API proxy, then pull down to refresh.';
+  }
+
+  return 'Check the deployed MetroLens API, then pull down to refresh.';
 }
 
 const styles = StyleSheet.create({
@@ -765,5 +869,103 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginTop: 14,
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(17, 24, 32, 0.52)',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  alertModal: {
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    maxHeight: '76%',
+    overflow: 'hidden',
+    width: '100%',
+    ...shadow,
+  },
+  modalHeader: {
+    alignItems: 'flex-start',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  modalTitleGroup: {
+    flex: 1,
+    marginRight: 12,
+    minWidth: 0,
+  },
+  modalKicker: {
+    color: colors.inkMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
+  },
+  modalTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 27,
+    marginTop: 5,
+  },
+  modalCloseButton: {
+    alignItems: 'center',
+    backgroundColor: colors.ink,
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 12,
+  },
+  modalCloseText: {
+    color: colors.surface,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  modalScrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  alertDetail: {
+    paddingVertical: 14,
+  },
+  alertDetailDivider: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+  },
+  alertDetailHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  alertDetailType: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '900',
+    marginRight: 10,
+  },
+  alertDetailDate: {
+    color: colors.inkMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  alertDetailLines: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 10,
+  },
+  alertDetailDescription: {
+    color: colors.ink,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 10,
   },
 });

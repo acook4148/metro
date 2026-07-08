@@ -24,6 +24,8 @@ const variants = {
 
 const appEnv = process.env.APP_ENV || 'development';
 const variant = variants[appEnv] || variants.development;
+const appGroupIdentifier = 'group.app.metrolens.mobile';
+const appleTeamId = process.env.APPLE_TEAM_ID;
 
 module.exports = {
   expo: {
@@ -38,6 +40,10 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: variant.bundleIdentifier,
+      ...(appleTeamId ? { appleTeamId } : {}),
+      entitlements: {
+        'com.apple.security.application-groups': [appGroupIdentifier],
+      },
     },
     android: {
       package: variant.packageName,
@@ -64,10 +70,14 @@ module.exports = {
           },
         },
       ],
+      '@bacons/apple-targets',
     ],
     extra: {
       appEnv,
       apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8787',
+      eas: {
+        projectId: "6e13a107-36f9-4df9-b134-260cedd38170"
+      }
     },
   },
 };
