@@ -23,6 +23,11 @@ import {
 import { LineBadge } from '../components/LineBadge';
 import { PredictionRow } from '../components/PredictionRow';
 import {
+  LinePreferenceSnapshot,
+  readLinePreferences,
+  setLinePreference,
+} from '../storage/linePreferenceStore';
+import {
   getCanonicalStationCode,
   incrementStationUsage,
   readStationUsage,
@@ -60,6 +65,7 @@ export function HomeScreen() {
   const [query, setQuery] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [stationUsage, setStationUsage] = useState<StationUsageSnapshot>({});
+  const [linePreferences, setLinePreferences] = useState<LinePreferenceSnapshot>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
@@ -71,6 +77,21 @@ export function HomeScreen() {
     () => stationGroups.find((station) => station.stationCodes.includes(selectedStationCode)) || null,
     [selectedStationCode, stationGroups],
   );
+
+  const preferredLine = useMemo(() => {
+    if (!selectedStation) return null;
+    return linePreferences[getCanonicalStationCode(selectedStation.stationCodes)] || null;
+  }, [linePreferences, selectedStation]);
+
+  const preferredLineOrder = useMemo(() => getPreferredLineOrder(preferredLine), [preferredLine]);
+
+  const selectedStationLines = useMemo(() => {
+    const lines = selectedStation?.lines.length
+      ? selectedStation.lines
+      : predictions.map((prediction) => prediction.line).filter(isPresent);
+
+    return sortLines(unique(lines), preferredLine).slice(0, 6);
+  }, [predictions, preferredLine, selectedStation]);
 
   const filteredStations = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -98,26 +119,27 @@ export function HomeScreen() {
 
     predictions.forEach((prediction) => {
       const line = prediction.line || '--';
-      groups.set(line, [...(groups.get(line) || []), prediction]);
+      const linePredictions = groups.get(line);
+      if (linePredictions) {
+        linePredictions.push(prediction);
+      } else {
+        groups.set(line, [prediction]);
+      }
     });
 
     return Array.from(groups.entries())
-      .sort(([lineA], [lineB]) => {
-        const lineAIndex = LINE_ORDER.indexOf(lineA);
-        const lineBIndex = LINE_ORDER.indexOf(lineB);
-
-        if (lineAIndex === -1 && lineBIndex === -1) return lineA.localeCompare(lineB);
-        if (lineAIndex === -1) return 1;
-        if (lineBIndex === -1) return -1;
-        return lineAIndex - lineBIndex;
-      })
+      .sort(([lineA], [lineB]) => compareLines(lineA, lineB, preferredLineOrder))
       .map(([line, linePredictions]) => ({
         line,
         predictions: linePredictions,
       }));
-  }, [predictions]);
+  }, [predictions, preferredLineOrder]);
 
-  const loadHome = useCallback(async (stationCodes: string | string[], refreshing = false) => {
+  const loadHome = useCallback(async (
+    stationCodes: string | string[],
+    refreshing = false,
+    activeLinePreferences: LinePreferenceSnapshot = {},
+  ) => {
     if (refreshing) {
       setIsRefreshing(true);
     } else {
@@ -131,13 +153,15 @@ export function HomeScreen() {
         metrolensApi.getStations(),
         metrolensApi.getIncidents(),
       ]);
-      const resolvedStationCodes = resolveStationCodes(stationsResponse.stations, requestedStationCodes[0]);
-      const predictionsResponses = await Promise.all(
-        resolvedStationCodes.map((stationCode) => metrolensApi.getPredictions(stationCode)),
-      );
       const resolvedStationGroups = groupStations(stationsResponse.stations);
       const resolvedStation = resolvedStationGroups.find((station) =>
-        station.stationCodes.includes(resolvedStationCodes[0]),
+        station.stationCodes.includes(requestedStationCodes[0]),
+      );
+      const resolvedStationCodes = resolvedStation?.stationCodes.length
+        ? resolvedStation.stationCodes
+        : [requestedStationCodes[0]];
+      const predictionsResponses = await Promise.all(
+        resolvedStationCodes.map((stationCode) => metrolensApi.getPredictions(stationCode)),
       );
       const nextPredictions = predictionsResponses.flatMap((response) => response.predictions);
       const nextUpdatedAt = getLatestFetchedAt(predictionsResponses.map((response) => response.fetchedAt));
@@ -148,12 +172,16 @@ export function HomeScreen() {
       setUpdatedAt(nextUpdatedAt);
 
       if (resolvedStation) {
+        const nextPreferredLine = activeLinePreferences[getCanonicalStationCode(resolvedStation.stationCodes)] || null;
+        const nextPreferredLineOrder = getPreferredLineOrder(nextPreferredLine);
+
         writeStationWidgetSnapshot({
           stationCode: resolvedStation.code,
           stationCodes: resolvedStation.stationCodes,
           stationName: resolvedStation.name,
-          lines: resolvedStation.lines,
-          predictions: createStationWidgetPredictions(nextPredictions),
+          lines: sortLines(resolvedStation.lines, nextPreferredLine),
+          preferredLineOrder: nextPreferredLineOrder,
+          predictions: createStationWidgetPredictions(nextPredictions, nextPreferredLineOrder),
           alertCount: incidentsResponse.incidents.length,
           fetchedAt: nextUpdatedAt,
           generatedAt: new Date().toISOString(),
@@ -171,13 +199,14 @@ export function HomeScreen() {
     let isMounted = true;
 
     const timeoutId = setTimeout(() => {
-      readStationUsage().then((storedUsage) => {
+      Promise.all([readStationUsage(), readLinePreferences()]).then(([storedUsage, storedLinePreferences]) => {
         if (!isMounted) return;
 
         const defaultStationCode = getDefaultStationCode(storedUsage);
         setStationUsage(storedUsage);
+        setLinePreferences(storedLinePreferences);
         setSelectedStationCode(defaultStationCode);
-        loadHome(defaultStationCode);
+        loadHome(defaultStationCode, false, storedLinePreferences);
       });
     }, 0);
 
@@ -191,8 +220,35 @@ export function HomeScreen() {
     Keyboard.dismiss();
     setSelectedStationCode(station.code);
     setQuery('');
-    loadHome(station.stationCodes);
+    loadHome(station.stationCodes, false, linePreferences);
     incrementStationUsage(station.stationCodes).then(setStationUsage).catch(() => undefined);
+  }
+
+  function selectPreferredLine(line: string) {
+    if (!selectedStation) return;
+
+    const nextLinePreferences = {
+      ...linePreferences,
+      [getCanonicalStationCode(selectedStation.stationCodes)]: line,
+    };
+    const nextPreferredLineOrder = getPreferredLineOrder(line);
+
+    setLinePreferences(nextLinePreferences);
+    setLinePreference(selectedStation.stationCodes, line).catch(() => undefined);
+
+    if (predictions.length === 0) return;
+
+    writeStationWidgetSnapshot({
+      stationCode: selectedStation.code,
+      stationCodes: selectedStation.stationCodes,
+      stationName: selectedStation.name,
+      lines: sortLines(selectedStation.lines, line),
+      preferredLineOrder: nextPreferredLineOrder,
+      predictions: createStationWidgetPredictions(predictions, nextPreferredLineOrder),
+      alertCount: incidents.length,
+      fetchedAt: updatedAt,
+      generatedAt: new Date().toISOString(),
+    });
   }
 
   return (
@@ -204,7 +260,7 @@ export function HomeScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             tintColor={colors.brand}
-            onRefresh={() => loadHome(selectedStation?.stationCodes || selectedStationCode, true)}
+            onRefresh={() => loadHome(selectedStation?.stationCodes || selectedStationCode, true, linePreferences)}
           />
         }
       >
@@ -274,7 +330,7 @@ export function HomeScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
-              onPress={() => loadHome(selectedStation?.stationCodes || selectedStationCode, true)}
+              onPress={() => loadHome(selectedStation?.stationCodes || selectedStationCode, true, linePreferences)}
               style={({ pressed }) => [styles.refreshButton, pressed && styles.pressed]}
             >
               <Text style={styles.refreshButtonText}>Refresh</Text>
@@ -282,12 +338,22 @@ export function HomeScreen() {
           </View>
 
           <View style={styles.selectedLineRow}>
-            {(selectedStation?.lines.length ? selectedStation.lines : predictions.map((prediction) => prediction.line))
-              .filter(Boolean)
-              .slice(0, 6)
-              .map((line, index) => (
-                <LineBadge code={line} key={`${line}-${index}`} />
-              ))}
+            {selectedStationLines.map((line) => (
+              <Pressable
+                accessibilityLabel={`Prefer ${LINE_NAMES[line] || `${line} Line`}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: line === preferredLine }}
+                key={line}
+                onPress={() => selectPreferredLine(line)}
+                style={({ pressed }) => [
+                  styles.linePreferenceButton,
+                  line === preferredLine && styles.linePreferenceButtonSelected,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <LineBadge code={line} />
+              </Pressable>
+            ))}
           </View>
 
           {updatedAt ? (
@@ -494,11 +560,6 @@ function groupStations(stations: MetroStation[]): StationGroup[] {
     .sort((stationA, stationB) => stationA.name.localeCompare(stationB.name));
 }
 
-function resolveStationCodes(stations: MetroStation[], stationCode: string): string[] {
-  const group = groupStations(stations).find((station) => station.stationCodes.includes(stationCode));
-  return group?.stationCodes.length ? group.stationCodes : [stationCode];
-}
-
 function getDefaultStationCode(stationUsage: StationUsageSnapshot): string {
   const topStationCode = Object.entries(stationUsage).sort(([, countA], [, countB]) => countB - countA)[0]?.[0];
   return topStationCode || DEFAULT_STATION_CODE;
@@ -541,20 +602,33 @@ function normalizeStationName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function sortLines(lines: string[]): string[] {
-  return lines.sort((lineA, lineB) => {
-    const lineAIndex = LINE_ORDER.indexOf(lineA);
-    const lineBIndex = LINE_ORDER.indexOf(lineB);
+function sortLines(lines: string[], preferredLine?: string | null): string[] {
+  const lineOrder = getPreferredLineOrder(preferredLine);
 
-    if (lineAIndex === -1 && lineBIndex === -1) return lineA.localeCompare(lineB);
-    if (lineAIndex === -1) return 1;
-    if (lineBIndex === -1) return -1;
-    return lineAIndex - lineBIndex;
-  });
+  return [...lines].sort((lineA, lineB) => compareLines(lineA, lineB, lineOrder));
+}
+
+function getPreferredLineOrder(preferredLine?: string | null): string[] {
+  if (!preferredLine) return LINE_ORDER;
+  return [preferredLine, ...LINE_ORDER.filter((line) => line !== preferredLine)];
+}
+
+function compareLines(lineA: string, lineB: string, lineOrder: string[]): number {
+  const lineAIndex = lineOrder.indexOf(lineA);
+  const lineBIndex = lineOrder.indexOf(lineB);
+
+  if (lineAIndex === -1 && lineBIndex === -1) return lineA.localeCompare(lineB);
+  if (lineAIndex === -1) return 1;
+  if (lineBIndex === -1) return -1;
+  return lineAIndex - lineBIndex;
 }
 
 function unique<T>(values: T[]): T[] {
   return Array.from(new Set(values));
+}
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value != null;
 }
 
 function formatStationCodes(stationCodes: string[]): string {
@@ -754,6 +828,15 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 14,
+  },
+  linePreferenceButton: {
+    borderColor: 'transparent',
+    borderRadius: 999,
+    borderWidth: 2,
+    padding: 2,
+  },
+  linePreferenceButtonSelected: {
+    borderColor: colors.ink,
   },
   updatedText: {
     color: colors.inkSubtle,

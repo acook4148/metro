@@ -15,6 +15,7 @@ export type StationWidgetSnapshot = {
   stationCodes: string[];
   stationName: string;
   lines: string[];
+  preferredLineOrder?: string[];
   predictions: WidgetPrediction[];
   alertCount: number;
   fetchedAt: string | null;
@@ -45,9 +46,15 @@ export function writeStationWidgetSnapshot(snapshot: StationWidgetSnapshot) {
   ExtensionStorage.reloadWidget('MetroLensWidget');
 }
 
-export function createStationWidgetPredictions(predictions: TrainPrediction[]): WidgetPrediction[] {
+export function createStationWidgetPredictions(
+  predictions: TrainPrediction[],
+  preferredLineOrder: string[] = [],
+): WidgetPrediction[] {
   return predictions
     .filter((prediction) => prediction.line)
+    .sort((predictionA, predictionB) =>
+      compareLines(predictionA.line, predictionB.line, preferredLineOrder),
+    )
     .slice(0, 8)
     .map((prediction) => ({
       destinationName: prediction.destinationName,
@@ -66,8 +73,26 @@ function isStationWidgetSnapshot(value: unknown): value is StationWidgetSnapshot
     Array.isArray(snapshot.stationCodes) &&
     typeof snapshot.stationName === 'string' &&
     Array.isArray(snapshot.lines) &&
+    (snapshot.preferredLineOrder === undefined ||
+      (Array.isArray(snapshot.preferredLineOrder) &&
+        snapshot.preferredLineOrder.every((line) => typeof line === 'string'))) &&
     Array.isArray(snapshot.predictions) &&
     typeof snapshot.alertCount === 'number' &&
     typeof snapshot.generatedAt === 'string'
   );
+}
+
+function compareLines(lineA: string | null, lineB: string | null, preferredLineOrder: string[]): number {
+  const lineAIndex = getLineIndex(lineA, preferredLineOrder);
+  const lineBIndex = getLineIndex(lineB, preferredLineOrder);
+
+  if (lineAIndex === lineBIndex) return 0;
+  return lineAIndex - lineBIndex;
+}
+
+function getLineIndex(line: string | null, preferredLineOrder: string[]): number {
+  if (!line) return Number.MAX_SAFE_INTEGER;
+
+  const index = preferredLineOrder.indexOf(line);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }

@@ -8,6 +8,24 @@ private let snapshotKey = "stationWidgetSnapshot"
 private let widgetKind = "MetroLensWidget"
 private let widgetApiBaseURL = "https://metrolens-api.wmata.workers.dev"
 
+private enum WidgetDateParser {
+    private static let fractionalFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let standardFormatter = ISO8601DateFormatter()
+
+    static func date(from value: String) -> Date? {
+        fractionalFormatter.date(from: value) ?? standardFormatter.date(from: value)
+    }
+
+    static func string(from date: Date) -> String {
+        fractionalFormatter.string(from: date)
+    }
+}
+
 struct WidgetPrediction: Codable, Hashable {
     let destinationName: String
     let line: String?
@@ -67,6 +85,7 @@ struct StationWidgetSnapshot: Codable {
     let stationCodes: [String]
     let stationName: String
     let lines: [String]
+    let preferredLineOrder: [String]?
     let predictions: [WidgetPrediction]
     let alertCount: Int
     let fetchedAt: String?
@@ -112,12 +131,15 @@ private enum MetroLensWidgetRefreshService {
         let stationCodes = snapshot.stationCodes.isEmpty ? [snapshot.stationCode] : snapshot.stationCodes
         let predictionResponses = try await fetchPredictionResponses(stationCodes: stationCodes)
         let incidentCount = (try? await fetchIncidents().incidents.count) ?? snapshot.alertCount
-        let predictions = predictionResponses
+        let predictions = sortPredictions(
+            predictionResponses
             .flatMap(\.predictions)
             .filter { prediction in
                 guard let line = prediction.line else { return false }
                 return !line.isEmpty
-            }
+            },
+            preferredLineOrder: snapshot.preferredLineOrder ?? []
+        )
             .prefix(8)
 
         return StationWidgetSnapshot(
@@ -125,10 +147,11 @@ private enum MetroLensWidgetRefreshService {
             stationCodes: snapshot.stationCodes,
             stationName: snapshot.stationName,
             lines: snapshot.lines,
+            preferredLineOrder: snapshot.preferredLineOrder,
             predictions: Array(predictions),
             alertCount: incidentCount,
             fetchedAt: latestFetchedAt(predictionResponses.map(\.fetchedAt)) ?? snapshot.fetchedAt,
-            generatedAt: ISO8601DateFormatter().string(from: Date())
+            generatedAt: WidgetDateParser.string(from: Date())
         )
     }
 
@@ -169,14 +192,40 @@ private enum MetroLensWidgetRefreshService {
     }
 
     private static func latestFetchedAt(_ values: [String]) -> String? {
-        let formatter = ISO8601DateFormatter()
         return values
             .compactMap { value -> (String, Date)? in
-                guard let date = formatter.date(from: value) else { return nil }
+                guard let date = WidgetDateParser.date(from: value) else { return nil }
                 return (value, date)
             }
             .max { left, right in left.1 < right.1 }?
             .0
+    }
+
+    private static func sortPredictions(
+        _ predictions: [WidgetPrediction],
+        preferredLineOrder: [String]
+    ) -> [WidgetPrediction] {
+        predictions
+            .enumerated()
+            .sorted { left, right in
+                let leftLineIndex = lineIndex(left.element.line, preferredLineOrder: preferredLineOrder)
+                let rightLineIndex = lineIndex(right.element.line, preferredLineOrder: preferredLineOrder)
+
+                if leftLineIndex == rightLineIndex {
+                    return left.offset < right.offset
+                }
+
+                return leftLineIndex < rightLineIndex
+            }
+            .map { $0.element }
+    }
+
+    private static func lineIndex(_ line: String?, preferredLineOrder: [String]) -> Int {
+        guard let line else {
+            return Int.max
+        }
+
+        return preferredLineOrder.firstIndex(of: line) ?? Int.max
     }
 }
 
@@ -397,9 +446,8 @@ struct MetroLensWidgetView: View {
     }
 
     private func ageLabel(_ snapshot: StationWidgetSnapshot) -> String {
-        let formatter = ISO8601DateFormatter()
         let timestamp = snapshot.fetchedAt ?? snapshot.generatedAt
-        guard let date = formatter.date(from: timestamp) else { return "--" }
+        guard let date = WidgetDateParser.date(from: timestamp) else { return "--" }
 
         let seconds = max(Int(Date().timeIntervalSince(date)), 0)
         if seconds < 60 {
@@ -448,6 +496,7 @@ private extension StationWidgetSnapshot {
         stationCodes: ["A01", "C01"],
         stationName: "Metro Center",
         lines: ["RD", "BL", "OR", "SV"],
+        preferredLineOrder: ["RD", "OR", "SV", "BL", "YL", "GR"],
         predictions: [
             WidgetPrediction(destinationName: "Glenmont", line: "RD", minutes: .number(3), rawMinutes: "3"),
             WidgetPrediction(destinationName: "Largo", line: "BL", minutes: .number(6), rawMinutes: "6"),
@@ -455,6 +504,6 @@ private extension StationWidgetSnapshot {
         ],
         alertCount: 0,
         fetchedAt: nil,
-        generatedAt: ISO8601DateFormatter().string(from: Date())
+        generatedAt: WidgetDateParser.string(from: Date())
     )
 }
