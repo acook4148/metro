@@ -288,20 +288,29 @@ struct MetroLensWidgetView: View {
 
     @ViewBuilder
     private var widgetContent: some View {
-        if #available(iOSApplicationExtension 17.0, *) {
-            contentBody
-                .containerBackground(widgetBackground, for: .widget)
-        } else {
-            contentBody
-                .background(widgetBackground)
+        switch family {
+        case .accessoryInline:
+            accessoryInlineContent
+        case .accessoryCircular:
+            accessoryCircularContent
+        case .accessoryRectangular:
+            accessoryRectangularContent
+        default:
+            if #available(iOSApplicationExtension 17.0, *) {
+                homeScreenContent
+                    .containerBackground(widgetBackground, for: .widget)
+            } else {
+                homeScreenContent
+                    .background(widgetBackground)
+            }
         }
     }
 
-    private var contentBody: some View {
+    private var homeScreenContent: some View {
         ZStack {
             widgetBackground
             if let snapshot = entry.snapshot {
-                content(snapshot)
+                homeScreenContent(snapshot)
             } else {
                 emptyState
             }
@@ -309,7 +318,7 @@ struct MetroLensWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func content(_ snapshot: StationWidgetSnapshot) -> some View {
+    private func homeScreenContent(_ snapshot: StationWidgetSnapshot) -> some View {
         VStack(alignment: .leading, spacing: contentSpacing) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(snapshot.stationName)
@@ -339,6 +348,71 @@ struct MetroLensWidgetView: View {
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
+    }
+
+    @ViewBuilder
+    private var accessoryInlineContent: some View {
+        if let snapshot = entry.snapshot {
+            Text(inlineAccessoryLabel(snapshot))
+        } else {
+            Text("MetroLens")
+        }
+    }
+
+    @ViewBuilder
+    private var accessoryCircularContent: some View {
+        if let prediction = entry.snapshot?.predictions.first {
+            VStack(spacing: 2) {
+                Circle()
+                    .fill(lineBackground(prediction.line ?? "--"))
+                    .frame(width: 12, height: 12)
+                Text(prediction.minutes?.label ?? "--")
+                    .font(.system(size: 18, weight: .bold))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.72)
+                    .lineLimit(1)
+            }
+            .widgetAccentable()
+        } else {
+            Image(systemName: "tram.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .widgetAccentable()
+        }
+    }
+
+    @ViewBuilder
+    private var accessoryRectangularContent: some View {
+        if let snapshot = entry.snapshot {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(snapshot.stationName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+
+                ForEach(Array(snapshot.predictions.prefix(2).enumerated()), id: \.offset) { _, prediction in
+                    HStack(spacing: 4) {
+                        Text(prediction.line ?? "--")
+                            .font(.system(size: 11, weight: .bold))
+                            .monospaced()
+                        Text(prediction.destinationName)
+                            .lineLimit(1)
+                        Spacer(minLength: 2)
+                        Text(prediction.minutes?.label ?? "--")
+                            .monospacedDigit()
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                }
+            }
+            .widgetAccentable()
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("MetroLens")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Open app to choose station")
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+            }
+            .widgetAccentable()
+        }
     }
 
     private var emptyState: some View {
@@ -462,6 +536,18 @@ struct MetroLensWidgetView: View {
         return "\(minutes / 60) hr"
     }
 
+    private func inlineAccessoryLabel(_ snapshot: StationWidgetSnapshot) -> String {
+        let predictions = snapshot.predictions.prefix(2).map { prediction in
+            "\(prediction.line ?? "--") \(prediction.minutes?.label ?? "--")"
+        }
+
+        if predictions.isEmpty {
+            return "\(snapshot.stationName): no trains"
+        }
+
+        return "\(snapshot.stationName): \(predictions.joined(separator: ", "))"
+    }
+
     private func lineBackground(_ line: String) -> Color {
         switch line {
         case "RD": return Color(red: 0.776, green: 0.157, blue: 0.157)
@@ -485,7 +571,7 @@ struct MetroLensWidget: Widget {
         }
         .configurationDisplayName("MetroLens Station")
         .description("Shows the latest arrivals for your selected Metro station.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryInline, .accessoryCircular, .accessoryRectangular])
         .contentMarginsDisabled()
     }
 }

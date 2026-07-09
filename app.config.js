@@ -1,21 +1,18 @@
 const variants = {
   development: {
     name: 'MetroLens Dev',
-    slug: 'metrolens-dev',
     scheme: 'metrolens-dev',
     bundleIdentifier: 'app.metrolens.dev',
     packageName: 'app.metrolens.dev',
   },
   staging: {
     name: 'MetroLens Staging',
-    slug: 'metrolens-staging',
     scheme: 'metrolens-staging',
     bundleIdentifier: 'app.metrolens.staging',
     packageName: 'app.metrolens.staging',
   },
   production: {
     name: 'MetroLens',
-    slug: 'metrolens',
     scheme: 'metrolens',
     bundleIdentifier: 'app.metrolens.mobile',
     packageName: 'app.metrolens.mobile',
@@ -24,13 +21,14 @@ const variants = {
 
 const appEnv = process.env.APP_ENV || 'development';
 const variant = variants[appEnv] || variants.development;
+const slug = 'metrolens-dev';
 const appGroupIdentifier = 'group.app.metrolens.mobile';
 const appleTeamId = process.env.APPLE_TEAM_ID;
 
 module.exports = {
   expo: {
     name: variant.name,
-    slug: variant.slug,
+    slug,
     version: '0.1.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
