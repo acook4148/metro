@@ -29,3 +29,14 @@ export const shadow = {
   shadowRadius: 24,
   elevation: 3,
 };
+
+export const fonts = {
+  medium: {
+    fontFamily: 'Helvetica Neue',
+    fontWeight: '500' as const,
+  },
+  bold: {
+    fontFamily: 'Helvetica Neue',
+    fontWeight: '700' as const,
+  },
+};

@@ -20,6 +20,7 @@ export type StationWidgetSnapshot = {
   alertCount: number;
   fetchedAt: string | null;
   generatedAt: string;
+  isRefreshing?: boolean;
 };
 
 const snapshotFile = new File(Paths.document, 'station-widget-snapshot.json');
@@ -78,7 +79,8 @@ function isStationWidgetSnapshot(value: unknown): value is StationWidgetSnapshot
         snapshot.preferredLineOrder.every((line) => typeof line === 'string'))) &&
     Array.isArray(snapshot.predictions) &&
     typeof snapshot.alertCount === 'number' &&
-    typeof snapshot.generatedAt === 'string'
+    typeof snapshot.generatedAt === 'string' &&
+    (snapshot.isRefreshing === undefined || typeof snapshot.isRefreshing === 'boolean')
   );
 }
 

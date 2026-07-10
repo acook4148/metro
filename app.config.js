@@ -1,18 +1,18 @@
 const variants = {
   development: {
-    name: 'MetroLens Dev',
+    name: 'DC Metro Mate Dev',
     scheme: 'metrolens-dev',
     bundleIdentifier: 'app.metrolens.dev',
     packageName: 'app.metrolens.dev',
   },
   staging: {
-    name: 'MetroLens Staging',
+    name: 'DC Metro Mate Staging',
     scheme: 'metrolens-staging',
     bundleIdentifier: 'app.metrolens.staging',
     packageName: 'app.metrolens.staging',
   },
   production: {
-    name: 'MetroLens',
+    name: 'DC Metro Mate',
     scheme: 'metrolens',
     bundleIdentifier: 'app.metrolens.mobile',
     packageName: 'app.metrolens.mobile',

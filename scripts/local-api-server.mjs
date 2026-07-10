@@ -142,7 +142,7 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`MetroLens local API running at http://${HOST}:${PORT}`);
+  console.log(`DC Metro Mate local API running at http://${HOST}:${PORT}`);
 });
 
 async function fetchWmata(path, params, ttlSeconds) {

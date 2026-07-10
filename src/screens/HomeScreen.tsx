@@ -37,7 +37,7 @@ import {
   createStationWidgetPredictions,
   writeStationWidgetSnapshot,
 } from '../storage/widgetSnapshotStore';
-import { colors, lineColors, shadow } from '../theme';
+import { colors, fonts, lineColors, shadow } from '../theme';
 
 const DEFAULT_STATION_CODE = 'A01';
 const LINE_ORDER = ['RD', 'OR', 'SV', 'BL', 'YL', 'GR'];
@@ -90,8 +90,8 @@ export function HomeScreen() {
       ? selectedStation.lines
       : predictions.map((prediction) => prediction.line).filter(isPresent);
 
-    return sortLines(unique(lines), preferredLine).slice(0, 6);
-  }, [predictions, preferredLine, selectedStation]);
+    return sortLines(unique(lines)).slice(0, 6);
+  }, [predictions, selectedStation]);
 
   const filteredStations = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -185,6 +185,7 @@ export function HomeScreen() {
           alertCount: incidentsResponse.incidents.length,
           fetchedAt: nextUpdatedAt,
           generatedAt: new Date().toISOString(),
+          isRefreshing: false,
         });
       }
     } catch (loadError) {
@@ -248,6 +249,7 @@ export function HomeScreen() {
       alertCount: incidents.length,
       fetchedAt: updatedAt,
       generatedAt: new Date().toISOString(),
+      isRefreshing: false,
     });
   }
 
@@ -266,7 +268,7 @@ export function HomeScreen() {
       >
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.eyebrow}>MetroLens</Text>
+            <Text style={styles.eyebrow}>DC Metro Mate</Text>
             <Text style={styles.title}>Where are you headed?</Text>
           </View>
           <View style={styles.livePill}>
@@ -647,7 +649,7 @@ function getApiErrorHint(): string {
     return 'Start the local API proxy, then pull down to refresh.';
   }
 
-  return 'Check the deployed MetroLens API, then pull down to refresh.';
+  return 'Check the deployed DC Metro Mate API, then pull down to refresh.';
 }
 
 const styles = StyleSheet.create({
@@ -669,13 +671,13 @@ const styles = StyleSheet.create({
   eyebrow: {
     color: colors.brand,
     fontSize: 13,
-    fontWeight: '900',
+    ...fonts.bold,
     letterSpacing: 0,
   },
   title: {
     color: colors.ink,
     fontSize: 32,
-    fontWeight: '900',
+    ...fonts.bold,
     letterSpacing: 0,
     lineHeight: 38,
     marginTop: 6,
@@ -702,7 +704,7 @@ const styles = StyleSheet.create({
   liveText: {
     color: colors.ink,
     fontSize: 13,
-    fontWeight: '800',
+    ...fonts.medium,
   },
   searchPanel: {
     backgroundColor: colors.surface,
@@ -715,7 +717,7 @@ const styles = StyleSheet.create({
   label: {
     color: colors.inkMuted,
     fontSize: 12,
-    fontWeight: '800',
+    ...fonts.bold,
     letterSpacing: 0,
     marginBottom: 8,
     textTransform: 'uppercase',
@@ -727,7 +729,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: colors.ink,
     fontSize: 18,
-    fontWeight: '700',
+    ...fonts.medium,
     minHeight: 52,
     paddingHorizontal: 14,
   },
@@ -758,12 +760,12 @@ const styles = StyleSheet.create({
   stationName: {
     color: colors.ink,
     fontSize: 15,
-    fontWeight: '800',
+    ...fonts.bold,
   },
   stationCode: {
     color: colors.inkMuted,
     fontSize: 12,
-    fontWeight: '700',
+    ...fonts.medium,
     marginTop: 3,
   },
   lineRow: {
@@ -798,14 +800,14 @@ const styles = StyleSheet.create({
   cardKicker: {
     color: colors.inkMuted,
     fontSize: 12,
-    fontWeight: '800',
+    ...fonts.bold,
     letterSpacing: 0,
     textTransform: 'uppercase',
   },
   cardTitle: {
     color: colors.ink,
     fontSize: 26,
-    fontWeight: '900',
+    ...fonts.bold,
     letterSpacing: 0,
     lineHeight: 31,
     marginTop: 6,
@@ -821,7 +823,7 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     color: colors.surface,
     fontSize: 13,
-    fontWeight: '900',
+    ...fonts.bold,
   },
   selectedLineRow: {
     flexDirection: 'row',
@@ -841,7 +843,7 @@ const styles = StyleSheet.create({
   updatedText: {
     color: colors.inkSubtle,
     fontSize: 12,
-    fontWeight: '700',
+    ...fonts.medium,
     marginTop: 12,
   },
   centerState: {
@@ -853,12 +855,13 @@ const styles = StyleSheet.create({
   stateTitle: {
     color: colors.ink,
     fontSize: 17,
-    fontWeight: '900',
+    ...fonts.bold,
     textAlign: 'center',
   },
   stateText: {
     color: colors.inkMuted,
     fontSize: 14,
+    ...fonts.medium,
     lineHeight: 20,
     marginTop: 8,
     textAlign: 'center',
@@ -874,17 +877,19 @@ const styles = StyleSheet.create({
   errorTitle: {
     color: colors.brandDark,
     fontSize: 16,
-    fontWeight: '900',
+    ...fonts.bold,
   },
   errorCopy: {
     color: colors.brandDark,
     fontSize: 14,
+    ...fonts.medium,
     lineHeight: 20,
     marginTop: 6,
   },
   errorHint: {
     color: colors.inkMuted,
     fontSize: 13,
+    ...fonts.medium,
     lineHeight: 19,
     marginTop: 8,
   },
@@ -909,14 +914,14 @@ const styles = StyleSheet.create({
     color: colors.ink,
     flex: 1,
     fontSize: 14,
-    fontWeight: '900',
+    ...fonts.bold,
     letterSpacing: 0,
     marginLeft: 8,
   },
   predictionGroupCount: {
     color: colors.inkMuted,
     fontSize: 12,
-    fontWeight: '800',
+    ...fonts.medium,
   },
   predictionGroupRows: {
     gap: 8,
@@ -930,7 +935,7 @@ const styles = StyleSheet.create({
   statusTitle: {
     color: colors.surface,
     fontSize: 22,
-    fontWeight: '900',
+    ...fonts.bold,
     letterSpacing: 0,
     lineHeight: 27,
     marginTop: 6,
@@ -944,12 +949,14 @@ const styles = StyleSheet.create({
   statusCopy: {
     color: '#C8D2CB',
     fontSize: 14,
+    ...fonts.medium,
     lineHeight: 20,
     marginTop: 12,
   },
   incidentPreview: {
     color: '#E5ECE7',
     fontSize: 14,
+    ...fonts.medium,
     lineHeight: 20,
     marginTop: 14,
   },
@@ -985,14 +992,14 @@ const styles = StyleSheet.create({
   modalKicker: {
     color: colors.inkMuted,
     fontSize: 12,
-    fontWeight: '800',
+    ...fonts.bold,
     letterSpacing: 0,
     textTransform: 'uppercase',
   },
   modalTitle: {
     color: colors.ink,
     fontSize: 22,
-    fontWeight: '900',
+    ...fonts.bold,
     letterSpacing: 0,
     lineHeight: 27,
     marginTop: 5,
@@ -1008,7 +1015,7 @@ const styles = StyleSheet.create({
   modalCloseText: {
     color: colors.surface,
     fontSize: 13,
-    fontWeight: '900',
+    ...fonts.bold,
   },
   modalScrollContent: {
     paddingHorizontal: 16,
@@ -1030,13 +1037,13 @@ const styles = StyleSheet.create({
     color: colors.ink,
     flex: 1,
     fontSize: 15,
-    fontWeight: '900',
+    ...fonts.bold,
     marginRight: 10,
   },
   alertDetailDate: {
     color: colors.inkMuted,
     fontSize: 12,
-    fontWeight: '800',
+    ...fonts.medium,
     marginTop: 2,
   },
   alertDetailLines: {
@@ -1048,6 +1055,7 @@ const styles = StyleSheet.create({
   alertDetailDescription: {
     color: colors.ink,
     fontSize: 15,
+    ...fonts.medium,
     lineHeight: 22,
     marginTop: 10,
   },

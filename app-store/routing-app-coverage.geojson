@@ -4,7 +4,7 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "MetroLens WMATA Metrorail Coverage",
+        "name": "DC Metro Mate WMATA Metrorail Coverage",
         "description": "Approximate coverage area for Washington Metro rail station information in Washington, DC, Maryland, and Virginia."
       },
       "geometry": {

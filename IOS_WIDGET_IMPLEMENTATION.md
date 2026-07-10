@@ -87,11 +87,11 @@ APPLE_TEAM_ID=YOUR_TEAM_ID npx eas-cli build --profile development --platform io
 ```
 
 5. Install the internal build on the iPhone.
-6. Open MetroLens and select a station.
+6. Open DC Metro Mate and select a station.
 7. Long-press the iPhone Home Screen.
 8. Tap `+`.
-9. Search for `MetroLens`.
-10. Add the small or medium MetroLens widget.
+9. Search for `DC Metro Mate`.
+10. Add the small or medium DC Metro Mate widget.
 11. Confirm the widget shows the selected station and last snapshot.
 
 To inspect the generated native target locally:

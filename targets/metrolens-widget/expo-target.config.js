@@ -2,7 +2,7 @@
 module.exports = (config) => ({
   type: 'widget',
   name: 'MetroLensWidget',
-  displayName: 'MetroLens',
+  displayName: 'DC Metro Mate',
   bundleIdentifier: '.widget',
   deploymentTarget: '17.0',
   frameworks: ['SwiftUI', 'WidgetKit', 'AppIntents'],

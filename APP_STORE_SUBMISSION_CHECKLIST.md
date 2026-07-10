@@ -1,14 +1,14 @@
 # App Store Submission Checklist
 
-Use this checklist before submitting MetroLens to App Review.
+Use this checklist before submitting DC Metro Mate to App Review.
 
 ## Required Policy And Privacy Items
 
 - [x] Publish a public Privacy Policy URL.
-  - Current URL: `https://metrolens.pages.dev/privacy-policy/`
+  - Current URL: `https://dc-metro-mate.pages.dev/privacy-policy/`
   - Required by Apple for the App Store product page.
   - It should explain that station usage, preferred line, and widget snapshots are stored locally on the device/App Group storage.
-  - It should explain that the app contacts the MetroLens API proxy to fetch WMATA rail data.
+  - It should explain that the app contacts the DC Metro Mate API proxy to fetch WMATA rail data.
   - It should include a support/contact method.
 
 - [ ] Complete App Privacy answers in App Store Connect.
@@ -36,7 +36,7 @@ Use this checklist before submitting MetroLens to App Review.
 - [ ] App Group value matches the code: `group.app.metrolens.mobile`.
 - [ ] App Store Connect app record exists.
 - [ ] App name, subtitle, category, SKU, and copyright are filled in.
-- [x] Support URL is public and reachable: `https://metrolens.pages.dev/support/`
+- [x] Support URL is public and reachable: `https://dc-metro-mate.pages.dev/support/`
 - [ ] Marketing URL is added if desired.
 
 ## App Metadata
@@ -47,7 +47,7 @@ Use this checklist before submitting MetroLens to App Review.
 - [ ] App Review notes explain the widget:
   - Open the app.
   - Select a station.
-  - Add the MetroLens widget.
+  - Add the DC Metro Mate widget.
   - Tap refresh on the widget to refresh arrivals.
 - [ ] No placeholder text remains in metadata, screenshots, support pages, or policy pages.
 

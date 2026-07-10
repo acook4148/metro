@@ -1,6 +1,6 @@
-# MetroLens
+# DC Metro Mate
 
-MetroLens is a React Native and Expo app for WMATA rail arrivals and service status on iOS and Android.
+DC Metro Mate is a React Native and Expo app for WMATA rail arrivals and service status on iOS and Android.
 
 ## Local Development
 
@@ -13,7 +13,7 @@ npm start
 
 ## Local WMATA API Proxy
 
-The app must call the MetroLens proxy, not WMATA directly. This keeps the WMATA API key out of the mobile bundle.
+The app must call the DC Metro Mate proxy, not WMATA directly. This keeps the WMATA API key out of the mobile bundle.
 
 Create a local env file:
 

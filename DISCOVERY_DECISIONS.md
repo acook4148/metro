@@ -151,7 +151,7 @@ MVP non-goals:
 
 Decision:
 
-- Working app name: MetroLens.
+- Working app name: DC Metro Mate.
 - Production iOS bundle identifier: `app.metrolens.mobile`.
 - Production Android application ID: `app.metrolens.mobile`.
 - Development identifier: `app.metrolens.dev`.
@@ -159,7 +159,7 @@ Decision:
 
 Rationale:
 
-- MetroLens is short, memorable, and fits the product goal: making WMATA rail status and next-train information clear at a glance.
+- DC Metro Mate is clear, memorable, and fits the product goal: making WMATA rail status and next-train information approachable at a glance.
 - Separate development, staging, and production identifiers allow parallel installs and safer testing.
 - These identifiers are implementation placeholders until a developer-owned domain, App Store Connect account, Google Play Console account, and trademark/app-store availability checks are finalized.
 

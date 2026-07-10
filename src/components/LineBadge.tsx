@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, lineColors } from '../theme';
+import { colors, fonts, lineColors } from '../theme';
 
 type LineBadgeProps = {
   code: string | null;
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontWeight: '800',
+    ...fonts.bold,
     letterSpacing: 0,
   },
   compactLabel: {

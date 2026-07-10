@@ -8,6 +8,16 @@ private let snapshotKey = "stationWidgetSnapshot"
 private let widgetKind = "MetroLensWidget"
 private let widgetApiBaseURL = "https://metrolens-api.wmata.workers.dev"
 
+private enum WidgetFont {
+    static func medium(_ size: CGFloat) -> Font {
+        .custom("HelveticaNeue-Medium", size: size)
+    }
+
+    static func bold(_ size: CGFloat) -> Font {
+        .custom("HelveticaNeue-Bold", size: size)
+    }
+}
+
 private enum WidgetDateParser {
     private static let fractionalFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -23,6 +33,36 @@ private enum WidgetDateParser {
 
     static func string(from date: Date) -> String {
         fractionalFormatter.string(from: date)
+    }
+}
+
+private enum StationNameFormatter {
+    private static let abbreviations = [
+        "Addison Road-Seat Pleasant": "Addison Rd",
+        "Brookland-CUA": "Brookland",
+        "College Park-U of Md": "College Park",
+        "Downtown Largo": "Largo",
+        "Fort Totten": "Ft Totten",
+        "Franconia-Springfield": "Franconia",
+        "L'Enfant Plaza": "L'Enfant",
+        "Minnesota Ave": "Minnesota",
+        "Mt Vernon Sq 7th St-Convention Center": "Mt Vernon Sq",
+        "NoMa-Gallaudet U": "NoMa",
+        "Potomac Ave": "Potomac",
+        "Rhode Island Ave-Brentwood": "Rhode Island",
+        "Ronald Reagan Washington National Airport": "DCA Airport",
+        "Southern Ave": "Southern",
+        "U St/African-Amer Civil War Memorial/Cardozo": "U St",
+        "Van Dorn Street": "Van Dorn",
+        "Vienna/Fairfax-GMU": "Vienna",
+        "Virginia Sq-GMU": "Virginia Sq",
+        "West Falls Church-VT/UVA": "West Falls Church",
+        "Wiehle-Reston East": "Wiehle-Reston",
+        "Woodley Park-Zoo/Adams Morgan": "Woodley Park"
+    ]
+
+    static func displayName(_ stationName: String) -> String {
+        abbreviations[stationName] ?? stationName
     }
 }
 
@@ -90,6 +130,7 @@ struct StationWidgetSnapshot: Codable {
     let alertCount: Int
     let fetchedAt: String?
     let generatedAt: String
+    let isRefreshing: Bool?
 }
 
 private struct PredictionsResponse: Decodable {
@@ -151,7 +192,8 @@ private enum MetroLensWidgetRefreshService {
             predictions: Array(predictions),
             alertCount: incidentCount,
             fetchedAt: latestFetchedAt(predictionResponses.map(\.fetchedAt)) ?? snapshot.fetchedAt,
-            generatedAt: WidgetDateParser.string(from: Date())
+            generatedAt: WidgetDateParser.string(from: Date()),
+            isRefreshing: false
         )
     }
 
@@ -231,8 +273,8 @@ private enum MetroLensWidgetRefreshService {
 
 @available(iOSApplicationExtension 17.0, *)
 struct RefreshMetroLensWidgetIntent: AppIntent {
-    static var title: LocalizedStringResource = "Refresh MetroLens"
-    static var description = IntentDescription("Refreshes MetroLens arrivals.")
+    static var title: LocalizedStringResource = "Refresh DC Metro Mate"
+    static var description = IntentDescription("Refreshes DC Metro Mate arrivals.")
     static var openAppWhenRun = false
 
     func perform() async -> some IntentResult {
@@ -244,8 +286,13 @@ struct RefreshMetroLensWidgetIntent: AppIntent {
             return .result()
         }
 
+        try? WidgetSnapshotStore.save(snapshot.withRefreshState(true))
+        WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
+
         if let refreshedSnapshot = try? await MetroLensWidgetRefreshService.refresh(snapshot) {
             try? WidgetSnapshotStore.save(refreshedSnapshot)
+        } else {
+            try? WidgetSnapshotStore.save(snapshot.withRefreshState(false))
         }
 
         return .result()
@@ -321,20 +368,20 @@ struct MetroLensWidgetView: View {
     private func homeScreenContent(_ snapshot: StationWidgetSnapshot) -> some View {
         VStack(alignment: .leading, spacing: contentSpacing) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(snapshot.stationName)
-                    .font(.system(size: titleSize, weight: .medium))
+                Text(displayStationName(snapshot))
+                    .font(WidgetFont.medium(titleSize))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.62)
+                    .truncationMode(.tail)
 
                 Spacer(minLength: 4)
 
                 HStack(spacing: 5) {
                     Text(ageLabel(snapshot))
-                        .font(.system(size: ageSize, weight: .semibold))
+                        .font(WidgetFont.medium(ageSize))
                         .foregroundColor(secondaryText)
                         .lineLimit(1)
-                    refreshButton
+                    refreshControl(snapshot)
                 }
             }
 
@@ -354,8 +401,10 @@ struct MetroLensWidgetView: View {
     private var accessoryInlineContent: some View {
         if let snapshot = entry.snapshot {
             Text(inlineAccessoryLabel(snapshot))
+                .font(WidgetFont.medium(12))
         } else {
-            Text("MetroLens")
+            Text("DC Metro Mate")
+                .font(WidgetFont.medium(12))
         }
     }
 
@@ -367,7 +416,7 @@ struct MetroLensWidgetView: View {
                     .fill(lineBackground(prediction.line ?? "--"))
                     .frame(width: 12, height: 12)
                 Text(prediction.minutes?.label ?? "--")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(WidgetFont.bold(18))
                     .monospacedDigit()
                     .minimumScaleFactor(0.72)
                     .lineLimit(1)
@@ -384,14 +433,26 @@ struct MetroLensWidgetView: View {
     private var accessoryRectangularContent: some View {
         if let snapshot = entry.snapshot {
             VStack(alignment: .leading, spacing: 2) {
-                Text(snapshot.stationName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(displayStationName(snapshot))
+                        .font(WidgetFont.bold(13))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Spacer(minLength: 2)
+
+                    Text(ageLabel(snapshot))
+                        .font(WidgetFont.medium(10))
+                        .monospacedDigit()
+                        .lineLimit(1)
+
+                    accessoryRefreshControl(snapshot)
+                }
 
                 ForEach(Array(snapshot.predictions.prefix(2).enumerated()), id: \.offset) { _, prediction in
                     HStack(spacing: 4) {
                         Text(prediction.line ?? "--")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(WidgetFont.bold(11))
                             .monospaced()
                         Text(prediction.destinationName)
                             .lineLimit(1)
@@ -399,16 +460,16 @@ struct MetroLensWidgetView: View {
                         Text(prediction.minutes?.label ?? "--")
                             .monospacedDigit()
                     }
-                    .font(.system(size: 12, weight: .medium))
+                    .font(WidgetFont.medium(12))
                 }
             }
             .widgetAccentable()
         } else {
             VStack(alignment: .leading, spacing: 2) {
-                Text("MetroLens")
-                    .font(.system(size: 13, weight: .semibold))
+                Text("DC Metro Mate")
+                    .font(WidgetFont.bold(13))
                 Text("Open app to choose station")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(WidgetFont.medium(12))
                     .lineLimit(1)
             }
             .widgetAccentable()
@@ -417,11 +478,11 @@ struct MetroLensWidgetView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("MetroLens")
-                .font(.system(size: 18, weight: .medium))
+            Text("DC Metro Mate")
+                .font(WidgetFont.medium(18))
                 .foregroundColor(.white)
             Text("Open the app and select a station.")
-                .font(.system(size: 13, weight: .medium))
+                .font(WidgetFont.medium(13))
                 .foregroundColor(secondaryText)
             Spacer()
         }
@@ -431,15 +492,15 @@ struct MetroLensWidgetView: View {
     }
 
     private var predictionLimit: Int {
-        family == .systemMedium ? 4 : 3
+        family == .systemMedium ? 4 : 5
     }
 
     private var contentSpacing: CGFloat {
-        family == .systemMedium ? 8 : 6
+        family == .systemMedium ? 8 : 5
     }
 
     private var titleSize: CGFloat {
-        family == .systemMedium ? 19 : 17
+        family == .systemMedium ? 19 : 16
     }
 
     private var ageSize: CGFloat {
@@ -451,19 +512,19 @@ struct MetroLensWidgetView: View {
     }
 
     private var rowSpacing: CGFloat {
-        family == .systemMedium ? 8 : 5
+        family == .systemMedium ? 8 : 3
     }
 
     private var rowTextSize: CGFloat {
-        family == .systemMedium ? 17 : 15
+        family == .systemMedium ? 17 : 13
     }
 
     private var minuteTextSize: CGFloat {
-        family == .systemMedium ? 17 : 14
+        family == .systemMedium ? 17 : 13
     }
 
     private var dotSize: CGFloat {
-        family == .systemMedium ? 16 : 14
+        family == .systemMedium ? 16 : 12
     }
 
     private var horizontalPadding: CGFloat {
@@ -471,7 +532,7 @@ struct MetroLensWidgetView: View {
     }
 
     private var verticalPadding: CGFloat {
-        family == .systemMedium ? 10 : 9
+        family == .systemMedium ? 10 : 8
     }
 
     private var widgetBackground: Color {
@@ -482,14 +543,42 @@ struct MetroLensWidgetView: View {
         Color(red: 0.79, green: 0.79, blue: 0.77)
     }
 
-    private var refreshButton: some View {
-        Button(intent: RefreshMetroLensWidgetIntent()) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: refreshIconSize, weight: .semibold))
-                .foregroundColor(secondaryText)
+    @ViewBuilder
+    private func refreshControl(_ snapshot: StationWidgetSnapshot) -> some View {
+        if snapshot.isRefreshing == true {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .controlSize(.small)
+                .tint(secondaryText)
+                .frame(width: refreshIconSize, height: refreshIconSize)
+                .accessibilityLabel("Refreshing arrivals")
+        } else {
+            Button(intent: RefreshMetroLensWidgetIntent()) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: refreshIconSize, weight: .semibold))
+                    .foregroundColor(secondaryText)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Refresh arrivals")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Refresh arrivals")
+    }
+
+    @ViewBuilder
+    private func accessoryRefreshControl(_ snapshot: StationWidgetSnapshot) -> some View {
+        if snapshot.isRefreshing == true {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .controlSize(.small)
+                .frame(width: 10, height: 10)
+                .accessibilityLabel("Refreshing arrivals")
+        } else {
+            Button(intent: RefreshMetroLensWidgetIntent()) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Refresh arrivals")
+        }
     }
 
     private func predictionRow(_ prediction: WidgetPrediction) -> some View {
@@ -502,7 +591,7 @@ struct MetroLensWidgetView: View {
                 }
 
             Text(prediction.destinationName)
-                .font(.system(size: rowTextSize, weight: .regular))
+                .font(WidgetFont.medium(rowTextSize))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.56)
@@ -511,12 +600,12 @@ struct MetroLensWidgetView: View {
             Spacer(minLength: 3)
 
             Text(prediction.minutes?.label ?? "--")
-                .font(.system(size: minuteTextSize, weight: .regular))
+                .font(WidgetFont.medium(minuteTextSize))
                 .foregroundColor(.white)
                 .monospacedDigit()
                 .lineLimit(1)
         }
-        .frame(minHeight: family == .systemMedium ? 21 : 18)
+        .frame(minHeight: family == .systemMedium ? 21 : 16)
     }
 
     private func ageLabel(_ snapshot: StationWidgetSnapshot) -> String {
@@ -537,15 +626,20 @@ struct MetroLensWidgetView: View {
     }
 
     private func inlineAccessoryLabel(_ snapshot: StationWidgetSnapshot) -> String {
+        let stationName = displayStationName(snapshot)
         let predictions = snapshot.predictions.prefix(2).map { prediction in
             "\(prediction.line ?? "--") \(prediction.minutes?.label ?? "--")"
         }
 
         if predictions.isEmpty {
-            return "\(snapshot.stationName): no trains"
+            return "\(stationName): no trains - \(ageLabel(snapshot))"
         }
 
-        return "\(snapshot.stationName): \(predictions.joined(separator: ", "))"
+        return "\(stationName): \(predictions.joined(separator: ", ")) - \(ageLabel(snapshot))"
+    }
+
+    private func displayStationName(_ snapshot: StationWidgetSnapshot) -> String {
+        StationNameFormatter.displayName(snapshot.stationName)
     }
 
     private func lineBackground(_ line: String) -> Color {
@@ -569,7 +663,7 @@ struct MetroLensWidget: Widget {
         StaticConfiguration(kind: kind, provider: MetroLensProvider()) { entry in
             MetroLensWidgetView(entry: entry)
         }
-        .configurationDisplayName("MetroLens Station")
+        .configurationDisplayName("DC Metro Mate Station")
         .description("Shows the latest arrivals for your selected Metro station.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryInline, .accessoryCircular, .accessoryRectangular])
         .contentMarginsDisabled()
@@ -590,6 +684,24 @@ private extension StationWidgetSnapshot {
         ],
         alertCount: 0,
         fetchedAt: nil,
-        generatedAt: WidgetDateParser.string(from: Date())
+        generatedAt: WidgetDateParser.string(from: Date()),
+        isRefreshing: false
     )
+}
+
+private extension StationWidgetSnapshot {
+    func withRefreshState(_ isRefreshing: Bool) -> StationWidgetSnapshot {
+        StationWidgetSnapshot(
+            stationCode: stationCode,
+            stationCodes: stationCodes,
+            stationName: stationName,
+            lines: lines,
+            preferredLineOrder: preferredLineOrder,
+            predictions: predictions,
+            alertCount: alertCount,
+            fetchedAt: fetchedAt,
+            generatedAt: generatedAt,
+            isRefreshing: isRefreshing
+        )
+    }
 }

@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { TrainPrediction } from '../api/metrolensApi';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { LineBadge } from './LineBadge';
 
 type PredictionRowProps = {
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   destination: {
     color: colors.ink,
     fontSize: 16,
-    fontWeight: '800',
+    ...fonts.medium,
     letterSpacing: 0,
   },
   timeColumn: {
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   minutes: {
     color: colors.ink,
     fontSize: 24,
-    fontWeight: '900',
+    ...fonts.bold,
     letterSpacing: 0,
   },
 });
