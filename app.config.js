@@ -31,7 +31,7 @@ module.exports = {
     slug,
     version: '0.1.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: './assets/logo.png',
     userInterfaceStyle: 'automatic',
     scheme: variant.scheme,
     newArchEnabled: true,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Keyboard,
   Modal,
   Pressable,
@@ -267,14 +268,12 @@ export function HomeScreen() {
         }
       >
         <View style={styles.topBar}>
-          <View>
-            <Text style={styles.eyebrow}>DC Metro Mate</Text>
-            <Text style={styles.title}>Where are you headed?</Text>
-          </View>
-          <View style={styles.livePill}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>Live</Text>
-          </View>
+          <Image
+            accessibilityLabel="DC Metro Mate"
+            resizeMode="contain"
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+          />
         </View>
 
         <View style={styles.searchPanel}>
@@ -663,48 +662,12 @@ const styles = StyleSheet.create({
     paddingTop: 34,
   },
   topBar: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  eyebrow: {
-    color: colors.brand,
-    fontSize: 13,
-    ...fonts.bold,
-    letterSpacing: 0,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 32,
-    ...fonts.bold,
-    letterSpacing: 0,
-    lineHeight: 38,
-    marginTop: 6,
-    maxWidth: 280,
-  },
-  livePill: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: 'row',
-    minHeight: 34,
-    paddingHorizontal: 12,
-    ...shadow,
+    marginBottom: 16,
   },
-  liveDot: {
-    backgroundColor: colors.success,
-    borderRadius: 99,
-    height: 8,
-    marginRight: 7,
-    width: 8,
-  },
-  liveText: {
-    color: colors.ink,
-    fontSize: 13,
-    ...fonts.medium,
+  logo: {
+    height: 108,
+    width: 176,
   },
   searchPanel: {
     backgroundColor: colors.surface,

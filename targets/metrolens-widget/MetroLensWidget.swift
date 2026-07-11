@@ -10,11 +10,11 @@ private let widgetApiBaseURL = "https://metrolens-api.wmata.workers.dev"
 
 private enum WidgetFont {
     static func medium(_ size: CGFloat) -> Font {
-        .custom("HelveticaNeue-Medium", size: size)
+        .custom("HelveticaNeue-Medium", fixedSize: size)
     }
 
     static func bold(_ size: CGFloat) -> Font {
-        .custom("HelveticaNeue-Bold", size: size)
+        .custom("HelveticaNeue-Bold", fixedSize: size)
     }
 }
 
@@ -39,25 +39,67 @@ private enum WidgetDateParser {
 private enum StationNameFormatter {
     private static let abbreviations = [
         "Addison Road-Seat Pleasant": "Addison Rd",
+        "Archives-Navy Memorial-Penn Quarter": "Archives",
+        "Arlington Cemetery": "Arlington",
+        "Braddock Road": "Braddock Rd",
         "Brookland-CUA": "Brookland",
+        "Capitol Heights": "Capitol Hts",
+        "Capitol South": "Capitol S",
+        "Cleveland Park": "Cleveland Pk",
+        "Columbia Heights": "Columbia Hts",
         "College Park-U of Md": "College Park",
+        "Congress Heights": "Congress Hts",
+        "Dupont Circle": "Dupont Cir",
+        "Dunn Loring-Merrifield": "Dunn Loring",
         "Downtown Largo": "Largo",
+        "East Falls Church": "East Falls",
+        "Eastern Market": "Eastern Mkt",
+        "Eisenhower Avenue": "Eisenhower",
+        "Farragut North": "Farragut N",
+        "Farragut West": "Farragut W",
+        "Federal Center SW": "Federal Ctr",
+        "Federal Triangle": "Federal Tri",
+        "Foggy Bottom-GWU": "Foggy Bottom",
         "Fort Totten": "Ft Totten",
         "Franconia-Springfield": "Franconia",
+        "Friendship Heights": "Friendship",
+        "Gallery Pl-Chinatown": "Gallery Pl",
+        "Georgia Ave-Petworth": "Georgia Ave",
+        "Grosvenor-Strathmore": "Grosvenor",
+        "Hyattsville Crossing": "Hyattsville",
+        "Innovation Center": "Innovation",
+        "Judiciary Square": "Judiciary Sq",
+        "King St-Old Town": "King St",
         "L'Enfant Plaza": "L'Enfant",
+        "Loudoun Gateway": "Loudoun Gate",
+        "McPherson Square": "McPherson Sq",
+        "Medical Center": "Medical Ctr",
         "Minnesota Ave": "Minnesota",
+        "Morgan Boulevard": "Morgan Blvd",
         "Mt Vernon Sq 7th St-Convention Center": "Mt Vernon Sq",
+        "Navy Yard-Ballpark": "Navy Yard",
+        "New Carrollton": "New Carroll",
         "NoMa-Gallaudet U": "NoMa",
+        "North Bethesda": "N Bethesda",
+        "Pentagon City": "Pentagon Cty",
         "Potomac Ave": "Potomac",
+        "Reston Town Center": "Reston TC",
         "Rhode Island Ave-Brentwood": "Rhode Island",
         "Ronald Reagan Washington National Airport": "DCA Airport",
-        "Southern Ave": "Southern",
-        "U St/African-Amer Civil War Memorial/Cardozo": "U St",
+        "Shaw-Howard U": "Shaw-Howard",
+        "Silver Spring": "Silver Spg",
+        "Southern Avenue": "Southern Ave",
+        "Stadium-Armory": "Stadium",
+        "Tenleytown-AU": "Tenleytown",
+        "U Street/African-Amer Civil War Memorial/Cardozo": "U Street",
+        "Union Station": "Union Sta",
         "Van Dorn Street": "Van Dorn",
         "Vienna/Fairfax-GMU": "Vienna",
-        "Virginia Sq-GMU": "Virginia Sq",
-        "West Falls Church-VT/UVA": "West Falls Church",
-        "Wiehle-Reston East": "Wiehle-Reston",
+        "Virginia Square-GMU": "Virginia Sq",
+        "Washington Dulles International Airport": "Dulles Intl",
+        "West Falls Church": "West Falls",
+        "West Hyattsville": "West Hyatts",
+        "Wiehle-Reston East": "Wiehle",
         "Woodley Park-Zoo/Adams Morgan": "Woodley Park"
     ]
 
@@ -372,16 +414,15 @@ struct MetroLensWidgetView: View {
                     .font(WidgetFont.medium(titleSize))
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .minimumScaleFactor(1)
                     .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, stationTitleLeadingPadding)
 
                 Spacer(minLength: 4)
 
-                HStack(spacing: 5) {
-                    Text(ageLabel(snapshot))
-                        .font(WidgetFont.medium(ageSize))
-                        .foregroundColor(secondaryText)
-                        .lineLimit(1)
-                    refreshControl(snapshot)
+                if family == .systemMedium {
+                    refreshStatus(snapshot)
                 }
             }
 
@@ -392,6 +433,11 @@ struct MetroLensWidgetView: View {
             }
 
             Spacer(minLength: 0)
+
+            if family == .systemSmall {
+                refreshStatus(snapshot)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
@@ -400,11 +446,13 @@ struct MetroLensWidgetView: View {
     @ViewBuilder
     private var accessoryInlineContent: some View {
         if let snapshot = entry.snapshot {
-            Text(inlineAccessoryLabel(snapshot))
+            inlineAccessoryText(snapshot)
                 .font(WidgetFont.medium(12))
+                .minimumScaleFactor(1)
         } else {
             Text("DC Metro Mate")
                 .font(WidgetFont.medium(12))
+                .minimumScaleFactor(1)
         }
     }
 
@@ -412,9 +460,11 @@ struct MetroLensWidgetView: View {
     private var accessoryCircularContent: some View {
         if let prediction = entry.snapshot?.predictions.first {
             VStack(spacing: 2) {
-                Circle()
-                    .fill(lineBackground(prediction.line ?? "--"))
-                    .frame(width: 12, height: 12)
+                Text(lineCodeLabel(prediction.line))
+                    .font(WidgetFont.bold(13))
+                    .foregroundColor(lineBackground(prediction.line ?? "--"))
+                    .monospaced()
+                    .lineLimit(1)
                 Text(prediction.minutes?.label ?? "--")
                     .font(WidgetFont.bold(18))
                     .monospacedDigit()
@@ -437,6 +487,7 @@ struct MetroLensWidgetView: View {
                     Text(displayStationName(snapshot))
                         .font(WidgetFont.bold(13))
                         .lineLimit(1)
+                        .minimumScaleFactor(1)
                         .truncationMode(.tail)
 
                     Spacer(minLength: 2)
@@ -451,8 +502,9 @@ struct MetroLensWidgetView: View {
 
                 ForEach(Array(snapshot.predictions.prefix(2).enumerated()), id: \.offset) { _, prediction in
                     HStack(spacing: 4) {
-                        Text(prediction.line ?? "--")
+                        Text(lineCodeLabel(prediction.line))
                             .font(WidgetFont.bold(11))
+                            .foregroundColor(lineBackground(prediction.line ?? "--"))
                             .monospaced()
                         Text(prediction.destinationName)
                             .lineLimit(1)
@@ -503,6 +555,10 @@ struct MetroLensWidgetView: View {
         family == .systemMedium ? 19 : 16
     }
 
+    private var stationTitleLeadingPadding: CGFloat {
+        3
+    }
+
     private var ageSize: CGFloat {
         family == .systemMedium ? 13 : 11
     }
@@ -523,8 +579,8 @@ struct MetroLensWidgetView: View {
         family == .systemMedium ? 17 : 13
     }
 
-    private var dotSize: CGFloat {
-        family == .systemMedium ? 16 : 12
+    private var lineCodeWidth: CGFloat {
+        family == .systemMedium ? 30 : 24
     }
 
     private var horizontalPadding: CGFloat {
@@ -541,6 +597,16 @@ struct MetroLensWidgetView: View {
 
     private var secondaryText: Color {
         Color(red: 0.79, green: 0.79, blue: 0.77)
+    }
+
+    private func refreshStatus(_ snapshot: StationWidgetSnapshot) -> some View {
+        HStack(spacing: 5) {
+            Text(ageLabel(snapshot))
+                .font(WidgetFont.medium(ageSize))
+                .foregroundColor(secondaryText)
+                .lineLimit(1)
+            refreshControl(snapshot)
+        }
     }
 
     @ViewBuilder
@@ -583,9 +649,12 @@ struct MetroLensWidgetView: View {
 
     private func predictionRow(_ prediction: WidgetPrediction) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: family == .systemMedium ? 9 : 7) {
-            Circle()
-                .fill(lineBackground(prediction.line ?? "--"))
-                .frame(width: dotSize, height: dotSize)
+            Text(lineCodeLabel(prediction.line))
+                .font(WidgetFont.bold(rowTextSize))
+                .foregroundColor(lineBackground(prediction.line ?? "--"))
+                .monospaced()
+                .lineLimit(1)
+                .frame(width: lineCodeWidth, alignment: .leading)
                 .alignmentGuide(.firstTextBaseline) { context in
                     context[VerticalAlignment.center]
                 }
@@ -625,21 +694,37 @@ struct MetroLensWidgetView: View {
         return "\(minutes / 60) hr"
     }
 
-    private func inlineAccessoryLabel(_ snapshot: StationWidgetSnapshot) -> String {
+    private func inlineAccessoryText(_ snapshot: StationWidgetSnapshot) -> Text {
         let stationName = displayStationName(snapshot)
-        let predictions = snapshot.predictions.prefix(2).map { prediction in
-            "\(prediction.line ?? "--") \(prediction.minutes?.label ?? "--")"
-        }
+        let predictions = Array(snapshot.predictions.prefix(2))
 
         if predictions.isEmpty {
-            return "\(stationName): no trains - \(ageLabel(snapshot))"
+            return Text("\(stationName): no trains - \(ageLabel(snapshot))")
         }
 
-        return "\(stationName): \(predictions.joined(separator: ", ")) - \(ageLabel(snapshot))"
+        var label = Text("\(stationName): ")
+
+        for (index, prediction) in predictions.enumerated() {
+            if index > 0 {
+                label = label + Text(", ")
+            }
+
+            label = label
+                + Text(lineCodeLabel(prediction.line))
+                .foregroundColor(lineBackground(prediction.line ?? "--"))
+                + Text(" \(prediction.minutes?.label ?? "--")")
+        }
+
+        return label + Text(" - \(ageLabel(snapshot))")
     }
 
     private func displayStationName(_ snapshot: StationWidgetSnapshot) -> String {
         StationNameFormatter.displayName(snapshot.stationName)
+    }
+
+    private func lineCodeLabel(_ line: String?) -> String {
+        guard let line, !line.isEmpty else { return "--" }
+        return line
     }
 
     private func lineBackground(_ line: String) -> Color {
