@@ -1,4 +1,7 @@
 import Constants from 'expo-constants';
+import type { StationOperatingStatus } from '../../shared/stationSchedule.mjs';
+
+export type { StationOperatingStatus } from '../../shared/stationSchedule.mjs';
 
 export type MetroLine = {
   code: string;
@@ -59,6 +62,7 @@ type StationsResponse = {
 type PredictionsResponse = {
   stationCode: string;
   predictions: TrainPrediction[];
+  stationStatus?: StationOperatingStatus;
   fetchedAt: string;
 };
 

@@ -56,8 +56,8 @@ Use this checklist before submitting DC Metro Mate to App Review.
 - [ ] Upload App Store screenshots for the required device sizes.
 - [ ] Provide required iPhone screenshots.
   - Prefer current largest iPhone screenshots because App Store Connect can scale down to smaller sizes.
-- [ ] Provide iPad screenshots or disable tablet support before submission.
-  - Current config has `ios.supportsTablet: true`, so iPad screenshots may be required.
+- [x] Disable tablet support; this release is intentionally iPhone-only.
+  - `ios.supportsTablet` is set to `false`, so iPad screenshots are not required.
   - If the app is intended iPhone-only, change this before production submission.
 - [ ] Confirm app icon is final and renders correctly.
 - [ ] App previews are optional; skip unless there is a polished video.
@@ -82,9 +82,9 @@ Use this checklist before submitting DC Metro Mate to App Review.
 - [ ] Run local validation:
   - `npm run typecheck`
   - `npm run lint`
-  - `APPLE_TEAM_ID=YOUR_TEAM_ID npx expo prebuild --platform ios --no-install --clean`
+  - `npx expo prebuild --platform ios --no-install --clean`
 - [ ] Build production iOS:
-  - `APPLE_TEAM_ID=YOUR_TEAM_ID npx eas-cli build --profile production --platform ios`
+  - `npx eas-cli build --profile production --platform ios`
 - [ ] Submit with EAS Submit or upload manually:
   - `npx eas-cli submit --platform ios --profile production`
 

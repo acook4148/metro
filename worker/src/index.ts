@@ -1,3 +1,9 @@
+import {
+  getStationOperatingStatus,
+  unavailableStationOperatingStatus,
+} from '../../shared/stationSchedule.mjs';
+import type { WmataStationTimes } from '../../shared/stationSchedule.mjs';
+
 type WmataLine = {
   LineCode: string;
   DisplayName: string;
@@ -161,13 +167,22 @@ async function getStations(env: Env, ctx: WorkerContext, lineCode: string | null
 }
 
 async function getPredictions(env: Env, ctx: WorkerContext, stationCode: string): Promise<Response> {
-  const data = await fetchWmata<{ Trains?: WmataPrediction[] }>(
-    env,
-    ctx,
-    `/StationPrediction.svc/json/GetPrediction/${stationCode}`,
-    new URLSearchParams(),
-    15,
-  );
+  const [data, stationTimesData] = await Promise.all([
+    fetchWmata<{ Trains?: WmataPrediction[] }>(
+      env,
+      ctx,
+      `/StationPrediction.svc/json/GetPrediction/${stationCode}`,
+      new URLSearchParams(),
+      15,
+    ),
+    fetchWmata<{ StationTimes?: WmataStationTimes[] }>(
+      env,
+      ctx,
+      '/Rail.svc/json/jStationTimes',
+      new URLSearchParams({ StationCode: stationCode }),
+      86400,
+    ).catch(() => null),
+  ]);
 
   const predictions = (data.Trains ?? []).map((train) => ({
     cars: train.Car ?? null,
@@ -181,7 +196,13 @@ async function getPredictions(env: Env, ctx: WorkerContext, stationCode: string)
     rawMinutes: train.Min ?? null,
   }));
 
-  return json({ stationCode, predictions, fetchedAt: new Date().toISOString() }, 200, 15);
+  const stationTimes = stationTimesData?.StationTimes?.find((station) => station.Code === stationCode)
+    ?? stationTimesData?.StationTimes?.[0];
+  const stationStatus = stationTimes
+    ? getStationOperatingStatus(stationTimes)
+    : unavailableStationOperatingStatus();
+
+  return json({ stationCode, predictions, stationStatus, fetchedAt: new Date().toISOString() }, 200, 15);
 }
 
 async function getIncidents(env: Env, ctx: WorkerContext): Promise<Response> {
@@ -267,10 +288,12 @@ function normalizeMinutes(value: string | undefined): number | 'ARR' | 'BRD' | n
 
 function parseLinesAffected(value: string | undefined): string[] {
   if (!value) return [];
-  return value
-    .split(/[;,]/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  return Array.from(new Set(
+    value
+      .split(/[;,]/)
+      .map((line) => line.trim().toUpperCase())
+      .filter(Boolean),
+  ));
 }
 
 function json(body: unknown, status = 200, maxAgeSeconds = 0): Response {

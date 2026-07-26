@@ -151,11 +151,9 @@ enum PredictionMinutes: Codable, Hashable {
         case .number(let value):
             return "\(value)"
         case .text(let value):
-            if value == "ARR" {
-                return "Arr"
-            }
-            if value == "BRD" {
-                return "Board"
+            let normalizedValue = value.uppercased()
+            if normalizedValue == "ARR" || normalizedValue == "BRD" {
+                return normalizedValue
             }
             return value.isEmpty ? "--" : value
         }
@@ -172,12 +170,31 @@ struct StationWidgetSnapshot: Codable {
     let alertCount: Int
     let fetchedAt: String?
     let generatedAt: String
+    let isClosed: Bool?
+    let nextTrainTime: String?
     let isRefreshing: Bool?
 }
 
 private struct PredictionsResponse: Decodable {
     let predictions: [WidgetPrediction]
+    let stationStatus: StationOperatingStatusResponse?
     let fetchedAt: String
+}
+
+private struct StationOperatingStatusResponse: Decodable {
+    let isClosed: Bool?
+    let nextTrain: NextTrainScheduleResponse?
+}
+
+private struct NextTrainScheduleResponse: Decodable {
+    let localDate: String
+    let time: String
+    let displayTime: String
+}
+
+private struct CombinedStationOperatingStatus {
+    let isClosed: Bool?
+    let nextTrainTime: String?
 }
 
 private struct IncidentsResponse: Decodable {
@@ -214,6 +231,7 @@ private enum MetroLensWidgetRefreshService {
         let stationCodes = snapshot.stationCodes.isEmpty ? [snapshot.stationCode] : snapshot.stationCodes
         let predictionResponses = try await fetchPredictionResponses(stationCodes: stationCodes)
         let incidentCount = (try? await fetchIncidents().incidents.count) ?? snapshot.alertCount
+        let stationStatus = combinedStationOperatingStatus(predictionResponses)
         let predictions = sortPredictions(
             predictionResponses
             .flatMap(\.predictions)
@@ -235,6 +253,10 @@ private enum MetroLensWidgetRefreshService {
             alertCount: incidentCount,
             fetchedAt: latestFetchedAt(predictionResponses.map(\.fetchedAt)) ?? snapshot.fetchedAt,
             generatedAt: WidgetDateParser.string(from: Date()),
+            isClosed: stationStatus.isClosed ?? snapshot.isClosed,
+            nextTrainTime: stationStatus.isClosed == nil
+                ? snapshot.nextTrainTime
+                : stationStatus.nextTrainTime,
             isRefreshing: false
         )
     }
@@ -283,6 +305,31 @@ private enum MetroLensWidgetRefreshService {
             }
             .max { left, right in left.1 < right.1 }?
             .0
+    }
+
+    private static func combinedStationOperatingStatus(
+        _ responses: [PredictionsResponse]
+    ) -> CombinedStationOperatingStatus {
+        let statuses = responses.compactMap(\.stationStatus)
+
+        if statuses.contains(where: { $0.isClosed == false }) {
+            return CombinedStationOperatingStatus(isClosed: false, nextTrainTime: nil)
+        }
+
+        guard statuses.count == responses.count, statuses.allSatisfy({ $0.isClosed == true }) else {
+            return CombinedStationOperatingStatus(isClosed: nil, nextTrainTime: nil)
+        }
+
+        let nextTrain = statuses
+            .compactMap(\.nextTrain)
+            .min { left, right in
+                "\(left.localDate)T\(left.time)" < "\(right.localDate)T\(right.time)"
+            }
+
+        return CombinedStationOperatingStatus(
+            isClosed: true,
+            nextTrainTime: nextTrain?.displayTime
+        )
     }
 
     private static func sortPredictions(
@@ -409,26 +456,40 @@ struct MetroLensWidgetView: View {
 
     private func homeScreenContent(_ snapshot: StationWidgetSnapshot) -> some View {
         VStack(alignment: .leading, spacing: contentSpacing) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(displayStationName(snapshot))
-                    .font(WidgetFont.medium(titleSize))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, stationTitleLeadingPadding)
+            VStack(spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(displayStationName(snapshot))
+                        .font(WidgetFont.medium(titleSize))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 4)
+                    Spacer(minLength: 4)
 
-                if family == .systemMedium {
-                    refreshStatus(snapshot)
+                    if family == .systemMedium {
+                        refreshStatus(snapshot)
+                    }
                 }
+
+                Rectangle()
+                    .fill(secondaryText.opacity(0.28))
+                    .frame(height: 0.5)
             }
 
-            VStack(spacing: rowSpacing) {
-                ForEach(Array(snapshot.predictions.prefix(predictionLimit).enumerated()), id: \.offset) { _, prediction in
-                    predictionRow(prediction)
+            if snapshot.predictions.isEmpty && snapshot.isClosed == true {
+                Text(closedStatusLabel(snapshot))
+                    .font(WidgetFont.medium(rowTextSize))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(1)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: rowSpacing) {
+                    ForEach(Array(snapshot.predictions.prefix(predictionLimit).enumerated()), id: \.offset) { _, prediction in
+                        predictionRow(prediction)
+                    }
                 }
             }
 
@@ -437,10 +498,13 @@ struct MetroLensWidgetView: View {
             if family == .systemSmall {
                 refreshStatus(snapshot)
                     .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 6)
             }
         }
         .padding(.horizontal, horizontalPadding)
-        .padding(.vertical, verticalPadding)
+        .padding(.top, topPadding)
+        .padding(.bottom, bottomPadding)
+        .dynamicTypeSize(.medium)
     }
 
     @ViewBuilder
@@ -472,6 +536,18 @@ struct MetroLensWidgetView: View {
                     .lineLimit(1)
             }
             .widgetAccentable()
+        } else if let snapshot = entry.snapshot, snapshot.isClosed == true {
+            VStack(spacing: 1) {
+                Text("Closed")
+                    .font(WidgetFont.bold(10))
+                if let nextTrainTime = snapshot.nextTrainTime {
+                    Text(nextTrainTime)
+                        .font(WidgetFont.medium(9))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .widgetAccentable()
         } else {
             Image(systemName: "tram.fill")
                 .font(.system(size: 20, weight: .semibold))
@@ -500,19 +576,25 @@ struct MetroLensWidgetView: View {
                     accessoryRefreshControl(snapshot)
                 }
 
-                ForEach(Array(snapshot.predictions.prefix(2).enumerated()), id: \.offset) { _, prediction in
-                    HStack(spacing: 4) {
-                        Text(lineCodeLabel(prediction.line))
-                            .font(WidgetFont.bold(11))
-                            .foregroundColor(lineBackground(prediction.line ?? "--"))
-                            .monospaced()
-                        Text(prediction.destinationName)
-                            .lineLimit(1)
-                        Spacer(minLength: 2)
-                        Text(prediction.minutes?.label ?? "--")
-                            .monospacedDigit()
+                if snapshot.predictions.isEmpty && snapshot.isClosed == true {
+                    Text(closedStatusLabel(snapshot))
+                        .font(WidgetFont.medium(12))
+                        .lineLimit(2)
+                } else {
+                    ForEach(Array(snapshot.predictions.prefix(2).enumerated()), id: \.offset) { _, prediction in
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(lineCodeLabel(prediction.line))
+                                .font(WidgetFont.bold(12))
+                                .foregroundColor(lineBackground(prediction.line ?? "--"))
+                                .monospaced()
+                            Text(prediction.destinationName)
+                                .lineLimit(1)
+                            Spacer(minLength: 2)
+                            Text(prediction.minutes?.label ?? "--")
+                                .monospacedDigit()
+                        }
+                        .font(WidgetFont.medium(12))
                     }
-                    .font(WidgetFont.medium(12))
                 }
             }
             .widgetAccentable()
@@ -544,51 +626,55 @@ struct MetroLensWidgetView: View {
     }
 
     private var predictionLimit: Int {
-        family == .systemMedium ? 4 : 5
+        5
     }
 
     private var contentSpacing: CGFloat {
-        family == .systemMedium ? 8 : 5
+        family == .systemMedium ? 6 : 5
     }
 
     private var titleSize: CGFloat {
-        family == .systemMedium ? 19 : 16
-    }
-
-    private var stationTitleLeadingPadding: CGFloat {
-        3
+        family == .systemMedium ? 18 : 16
     }
 
     private var ageSize: CGFloat {
-        family == .systemMedium ? 13 : 11
+        family == .systemMedium ? 12 : 11
     }
 
     private var refreshIconSize: CGFloat {
-        family == .systemMedium ? 17 : 14
+        family == .systemMedium ? 15 : 14
     }
 
     private var rowSpacing: CGFloat {
-        family == .systemMedium ? 8 : 3
+        family == .systemMedium ? 4 : 3
     }
 
     private var rowTextSize: CGFloat {
-        family == .systemMedium ? 17 : 13
+        family == .systemMedium ? 15 : 13.5
     }
 
     private var minuteTextSize: CGFloat {
-        family == .systemMedium ? 17 : 13
+        family == .systemMedium ? 15 : 13.5
     }
 
     private var lineCodeWidth: CGFloat {
-        family == .systemMedium ? 30 : 24
+        family == .systemMedium ? 28 : 24
     }
 
     private var horizontalPadding: CGFloat {
-        family == .systemMedium ? 11 : 9
+        13
     }
 
-    private var verticalPadding: CGFloat {
-        family == .systemMedium ? 10 : 8
+    private var topPadding: CGFloat {
+        10
+    }
+
+    private var bottomPadding: CGFloat {
+        8
+    }
+
+    private var rowMinHeight: CGFloat {
+        family == .systemMedium ? 19 : 18
     }
 
     private var widgetBackground: Color {
@@ -597,6 +683,18 @@ struct MetroLensWidgetView: View {
 
     private var secondaryText: Color {
         Color(red: 0.79, green: 0.79, blue: 0.77)
+    }
+
+    private var scheduledTimeColor: Color {
+        Color(red: 0.91, green: 0.74, blue: 0.28)
+    }
+
+    private var boardingTimeColor: Color {
+        Color(red: 0.36, green: 0.72, blue: 0.48)
+    }
+
+    private var arrivingTimeColor: Color {
+        Color(red: 0.88, green: 0.39, blue: 0.16)
     }
 
     private func refreshStatus(_ snapshot: StationWidgetSnapshot) -> some View {
@@ -655,26 +753,43 @@ struct MetroLensWidgetView: View {
                 .monospaced()
                 .lineLimit(1)
                 .frame(width: lineCodeWidth, alignment: .leading)
-                .alignmentGuide(.firstTextBaseline) { context in
-                    context[VerticalAlignment.center]
-                }
 
-            Text(prediction.destinationName)
+            Text(StationNameFormatter.displayName(prediction.destinationName))
                 .font(WidgetFont.medium(rowTextSize))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.56)
+                .minimumScaleFactor(1)
                 .truncationMode(.tail)
 
             Spacer(minLength: 3)
 
             Text(prediction.minutes?.label ?? "--")
                 .font(WidgetFont.medium(minuteTextSize))
-                .foregroundColor(.white)
+                .foregroundColor(predictionTimeColor(prediction.minutes))
                 .monospacedDigit()
                 .lineLimit(1)
         }
-        .frame(minHeight: family == .systemMedium ? 21 : 16)
+        .frame(minHeight: rowMinHeight)
+    }
+
+    private func predictionTimeColor(_ minutes: PredictionMinutes?) -> Color {
+        switch minutes {
+        case .number:
+            return scheduledTimeColor
+        case .text(let value):
+            switch value.uppercased() {
+            case "BRD":
+                return boardingTimeColor
+            case "ARR":
+                return arrivingTimeColor
+            case "", "--":
+                return secondaryText
+            default:
+                return scheduledTimeColor
+            }
+        case nil:
+            return secondaryText
+        }
     }
 
     private func ageLabel(_ snapshot: StationWidgetSnapshot) -> String {
@@ -699,6 +814,9 @@ struct MetroLensWidgetView: View {
         let predictions = Array(snapshot.predictions.prefix(2))
 
         if predictions.isEmpty {
+            if snapshot.isClosed == true {
+                return Text("\(stationName): \(closedStatusLabel(snapshot))")
+            }
             return Text("\(stationName): no trains - \(ageLabel(snapshot))")
         }
 
@@ -722,13 +840,21 @@ struct MetroLensWidgetView: View {
         StationNameFormatter.displayName(snapshot.stationName)
     }
 
+    private func closedStatusLabel(_ snapshot: StationWidgetSnapshot) -> String {
+        guard let nextTrainTime = snapshot.nextTrainTime else {
+            return "Closed"
+        }
+        return "Closed. Next train at \(nextTrainTime)"
+    }
+
     private func lineCodeLabel(_ line: String?) -> String {
-        guard let line, !line.isEmpty else { return "--" }
-        return line
+        guard let line else { return "--" }
+        let normalizedLine = line.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return normalizedLine.isEmpty ? "--" : normalizedLine
     }
 
     private func lineBackground(_ line: String) -> Color {
-        switch line {
+        switch lineCodeLabel(line) {
         case "RD": return Color(red: 0.776, green: 0.157, blue: 0.157)
         case "OR": return Color(red: 0.949, green: 0.549, blue: 0.157)
         case "SV": return Color(red: 0.655, green: 0.663, blue: 0.675)
@@ -770,6 +896,8 @@ private extension StationWidgetSnapshot {
         alertCount: 0,
         fetchedAt: nil,
         generatedAt: WidgetDateParser.string(from: Date()),
+        isClosed: false,
+        nextTrainTime: nil,
         isRefreshing: false
     )
 }
@@ -786,6 +914,8 @@ private extension StationWidgetSnapshot {
             alertCount: alertCount,
             fetchedAt: fetchedAt,
             generatedAt: generatedAt,
+            isClosed: isClosed,
+            nextTrainTime: nextTrainTime,
             isRefreshing: isRefreshing
         )
     }

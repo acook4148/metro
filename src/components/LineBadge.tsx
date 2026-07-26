@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { normalizeMetroLineCode } from '../metroLines';
 import { colors, fonts, lineColors } from '../theme';
 
 type LineBadgeProps = {
@@ -8,7 +9,7 @@ type LineBadgeProps = {
 };
 
 export function LineBadge({ code, compact = false }: LineBadgeProps) {
-  const normalizedCode = code || '--';
+  const normalizedCode = normalizeMetroLineCode(code);
   const lineColor = lineColors[normalizedCode] || {
     background: colors.surfaceMuted,
     foreground: colors.inkMuted,

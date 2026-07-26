@@ -19,10 +19,16 @@ import {
   metrolensApi,
   MetroStation,
   ServiceIncident,
+  StationOperatingStatus,
   TrainPrediction,
 } from '../api/metrolensApi';
 import { LineBadge } from '../components/LineBadge';
 import { PredictionRow } from '../components/PredictionRow';
+import {
+  METRO_LINE_NAMES,
+  METRO_LINE_ORDER,
+  normalizeMetroLineCode,
+} from '../metroLines';
 import {
   LinePreferenceSnapshot,
   readLinePreferences,
@@ -41,21 +47,17 @@ import {
 import { colors, fonts, lineColors, shadow } from '../theme';
 
 const DEFAULT_STATION_CODE = 'A01';
-const LINE_ORDER = ['RD', 'OR', 'SV', 'BL', 'YL', 'GR'];
-const LINE_NAMES: Record<string, string> = {
-  RD: 'Red Line',
-  OR: 'Orange Line',
-  SV: 'Silver Line',
-  BL: 'Blue Line',
-  YL: 'Yellow Line',
-  GR: 'Green Line',
-};
 
 type StationGroup = {
   code: string;
   name: string;
   stationCodes: string[];
   lines: string[];
+};
+
+type CombinedStationStatus = {
+  isClosed: boolean;
+  nextTrainTime: string | null;
 };
 
 export function HomeScreen() {
@@ -65,6 +67,10 @@ export function HomeScreen() {
   const [selectedStationCode, setSelectedStationCode] = useState(DEFAULT_STATION_CODE);
   const [query, setQuery] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [stationStatus, setStationStatus] = useState<CombinedStationStatus>({
+    isClosed: false,
+    nextTrainTime: null,
+  });
   const [stationUsage, setStationUsage] = useState<StationUsageSnapshot>({});
   const [linePreferences, setLinePreferences] = useState<LinePreferenceSnapshot>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -91,7 +97,9 @@ export function HomeScreen() {
       ? selectedStation.lines
       : predictions.map((prediction) => prediction.line).filter(isPresent);
 
-    return sortLines(unique(lines)).slice(0, 6);
+    return sortLines(
+      unique(lines.map(normalizeMetroLineCode)).filter((line) => line !== '--'),
+    ).slice(0, 6);
   }, [predictions, selectedStation]);
 
   const filteredStations = useMemo(() => {
@@ -110,16 +118,19 @@ export function HomeScreen() {
   const affectedLines = useMemo(() => {
     const lines = new Set<string>();
     incidents.forEach((incident) => {
-      incident.linesAffected.forEach((line) => lines.add(line));
+      incident.linesAffected.forEach((line) => {
+        const normalizedLine = normalizeMetroLineCode(line);
+        if (normalizedLine !== '--') lines.add(normalizedLine);
+      });
     });
-    return Array.from(lines).slice(0, 6);
+    return sortLines(Array.from(lines)).slice(0, 6);
   }, [incidents]);
 
   const predictionGroups = useMemo(() => {
     const groups = new Map<string, TrainPrediction[]>();
 
     predictions.forEach((prediction) => {
-      const line = prediction.line || '--';
+      const line = normalizeMetroLineCode(prediction.line);
       const linePredictions = groups.get(line);
       if (linePredictions) {
         linePredictions.push(prediction);
@@ -166,11 +177,15 @@ export function HomeScreen() {
       );
       const nextPredictions = predictionsResponses.flatMap((response) => response.predictions);
       const nextUpdatedAt = getLatestFetchedAt(predictionsResponses.map((response) => response.fetchedAt));
+      const nextStationStatus = combineStationOperatingStatuses(
+        predictionsResponses.map((response) => response.stationStatus),
+      );
 
       setStations(stationsResponse.stations);
       setIncidents(incidentsResponse.incidents);
       setPredictions(nextPredictions);
       setUpdatedAt(nextUpdatedAt);
+      setStationStatus(nextStationStatus);
 
       if (resolvedStation) {
         const nextPreferredLine = activeLinePreferences[getCanonicalStationCode(resolvedStation.stationCodes)] || null;
@@ -186,6 +201,8 @@ export function HomeScreen() {
           alertCount: incidentsResponse.incidents.length,
           fetchedAt: nextUpdatedAt,
           generatedAt: new Date().toISOString(),
+          isClosed: nextStationStatus.isClosed,
+          nextTrainTime: nextStationStatus.nextTrainTime,
           isRefreshing: false,
         });
       }
@@ -250,8 +267,27 @@ export function HomeScreen() {
       alertCount: incidents.length,
       fetchedAt: updatedAt,
       generatedAt: new Date().toISOString(),
+      isClosed: stationStatus.isClosed,
+      nextTrainTime: stationStatus.nextTrainTime,
       isRefreshing: false,
     });
+  }
+
+  const isInitialLoading = isLoading && !error && stations.length === 0 && predictions.length === 0 && !updatedAt;
+
+  if (isInitialLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.initialLoadingScreen}>
+          <Image
+            accessibilityLabel="DC Metro Mate"
+            resizeMode="contain"
+            source={require('../../assets/logo-transparent.png')}
+            style={styles.initialLoadingLogo}
+          />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -271,7 +307,7 @@ export function HomeScreen() {
           <Image
             accessibilityLabel="DC Metro Mate"
             resizeMode="contain"
-            source={require('../../assets/logo.png')}
+            source={require('../../assets/logo-transparent.png')}
             style={styles.logo}
           />
         </View>
@@ -341,7 +377,7 @@ export function HomeScreen() {
           <View style={styles.selectedLineRow}>
             {selectedStationLines.map((line) => (
               <Pressable
-                accessibilityLabel={`Prefer ${LINE_NAMES[line] || `${line} Line`}`}
+                accessibilityLabel={`Prefer ${METRO_LINE_NAMES[line] || `${line} Line`}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: line === preferredLine }}
                 key={line}
@@ -378,8 +414,16 @@ export function HomeScreen() {
 
           {!isLoading && !error && predictions.length === 0 ? (
             <View style={styles.centerState}>
-              <Text style={styles.stateTitle}>No trains listed right now</Text>
-              <Text style={styles.stateText}>Try refreshing or choosing another station.</Text>
+              <Text style={styles.stateTitle}>
+                {stationStatus.isClosed
+                  ? formatClosedStationMessage(stationStatus.nextTrainTime)
+                  : 'No trains listed right now'}
+              </Text>
+              <Text style={styles.stateText}>
+                {stationStatus.isClosed
+                  ? "Based on WMATA's published station schedule."
+                  : 'Try refreshing or choosing another station.'}
+              </Text>
             </View>
           ) : null}
 
@@ -396,7 +440,7 @@ export function HomeScreen() {
                   <View style={styles.predictionGroupHeader}>
                     <LineBadge code={group.line} compact />
                     <Text style={styles.predictionGroupTitle}>
-                      {LINE_NAMES[group.line] || `${group.line} Line`}
+                      {METRO_LINE_NAMES[group.line] || `${group.line} Line`}
                     </Text>
                     <Text style={styles.predictionGroupCount}>
                       {group.predictions.length}
@@ -485,14 +529,11 @@ export function HomeScreen() {
                   key={incident.id || `${incident.updatedAt}-${index}`}
                   style={[styles.alertDetail, index > 0 && styles.alertDetailDivider]}
                 >
-                  <View style={styles.alertDetailHeader}>
-                    <Text style={styles.alertDetailType}>{incident.type || 'Rail alert'}</Text>
-                    {incident.updatedAt ? (
-                      <Text style={styles.alertDetailDate}>
-                        {new Date(incident.updatedAt).toLocaleTimeString()}
-                      </Text>
-                    ) : null}
-                  </View>
+                  {incident.updatedAt ? (
+                    <Text style={styles.alertDetailDate}>
+                      Updated {new Date(incident.updatedAt).toLocaleTimeString()}
+                    </Text>
+                  ) : null}
 
                   {incident.linesAffected.length > 0 ? (
                     <View style={styles.alertDetailLines}>
@@ -549,7 +590,10 @@ function groupStations(stations: MetroStation[]): StationGroup[] {
       const stationCodes = unique(group.flatMap((station) => [station.code, ...station.stationTogether]))
         .filter((code) => stationByCode.has(code))
         .sort();
-      const lines = sortLines(unique(group.flatMap((station) => station.lines)));
+      const lines = sortLines(
+        unique(group.flatMap((station) => station.lines).map(normalizeMetroLineCode))
+          .filter((line) => line !== '--'),
+      );
 
       return {
         code: stationCodes[0] || group[0].code,
@@ -610,8 +654,13 @@ function sortLines(lines: string[], preferredLine?: string | null): string[] {
 }
 
 function getPreferredLineOrder(preferredLine?: string | null): string[] {
-  if (!preferredLine) return LINE_ORDER;
-  return [preferredLine, ...LINE_ORDER.filter((line) => line !== preferredLine)];
+  if (!preferredLine) return METRO_LINE_ORDER;
+
+  const normalizedPreferredLine = normalizeMetroLineCode(preferredLine);
+  return [
+    normalizedPreferredLine,
+    ...METRO_LINE_ORDER.filter((line) => line !== normalizedPreferredLine),
+  ];
 }
 
 function compareLines(lineA: string, lineB: string, lineOrder: string[]): number {
@@ -643,6 +692,34 @@ function getLatestFetchedAt(fetchedAtValues: string[]): string | null {
   return Number.isFinite(latestTime) ? new Date(latestTime).toISOString() : fetchedAtValues[0];
 }
 
+function combineStationOperatingStatuses(
+  statuses: (StationOperatingStatus | undefined)[],
+): CombinedStationStatus {
+  const isClosed = statuses.length > 0 && statuses.every((status) => status?.isClosed === true);
+  if (!isClosed) {
+    return {
+      isClosed: false,
+      nextTrainTime: null,
+    };
+  }
+
+  const nextTrain = statuses
+    .map((status) => status?.nextTrain)
+    .filter(isPresent)
+    .sort((left, right) => (
+      `${left.localDate}T${left.time}`.localeCompare(`${right.localDate}T${right.time}`)
+    ))[0];
+
+  return {
+    isClosed: true,
+    nextTrainTime: nextTrain?.displayTime ?? null,
+  };
+}
+
+function formatClosedStationMessage(nextTrainTime: string | null): string {
+  return nextTrainTime ? `Closed. Next train at ${nextTrainTime}` : 'Closed';
+}
+
 function getApiErrorHint(): string {
   if (metrolensApiBaseUrl.includes('localhost') || metrolensApiBaseUrl.includes('127.0.0.1')) {
     return 'Start the local API proxy, then pull down to refresh.';
@@ -656,6 +733,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  initialLoadingScreen: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  initialLoadingLogo: {
+    height: 200,
+    width: 288,
+  },
   content: {
     paddingBottom: 32,
     paddingHorizontal: 18,
@@ -666,8 +754,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logo: {
-    height: 108,
-    width: 176,
+    height: 120,
+    width: 196,
   },
   searchPanel: {
     backgroundColor: colors.surface,
@@ -991,23 +1079,11 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     borderTopWidth: 1,
   },
-  alertDetailHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  alertDetailType: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: 15,
-    ...fonts.bold,
-    marginRight: 10,
-  },
   alertDetailDate: {
+    alignSelf: 'flex-end',
     color: colors.inkMuted,
     fontSize: 12,
     ...fonts.medium,
-    marginTop: 2,
   },
   alertDetailLines: {
     flexDirection: 'row',

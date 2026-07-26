@@ -48,13 +48,9 @@ The widget reads the snapshot from `UserDefaults(suiteName: "group.app.metrolens
 
 ## Remaining Native Build Requirement
 
-Set your Apple Team ID before prebuild/build:
-
-```sh
-export APPLE_TEAM_ID=YOUR_TEAM_ID
-```
-
-The app config reads this value into `ios.appleTeamId`.
+Apple Team ID `R6JUM7R433` is configured as the `ios.appleTeamId` default in
+`app.config.js`. The `APPLE_TEAM_ID` environment variable can still override it
+when needed.
 
 ## Testing
 
@@ -68,36 +64,30 @@ To test with EAS:
 npx eas-cli login
 ```
 
-2. Set the Apple Team ID:
-
-```sh
-export APPLE_TEAM_ID=YOUR_TEAM_ID
-```
-
-3. Configure EAS if this project is not already linked:
+2. Configure EAS if this project is not already linked:
 
 ```sh
 npx eas-cli build:configure
 ```
 
-4. Create an internal iOS build:
+3. Create an internal iOS build:
 
 ```sh
-APPLE_TEAM_ID=YOUR_TEAM_ID npx eas-cli build --profile development --platform ios
+npx eas-cli build --profile development --platform ios
 ```
 
-5. Install the internal build on the iPhone.
-6. Open DC Metro Mate and select a station.
-7. Long-press the iPhone Home Screen.
-8. Tap `+`.
-9. Search for `DC Metro Mate`.
-10. Add the small or medium DC Metro Mate widget.
-11. Confirm the widget shows the selected station and last snapshot.
+4. Install the internal build on the iPhone.
+5. Open DC Metro Mate and select a station.
+6. Long-press the iPhone Home Screen.
+7. Tap `+`.
+8. Search for `DC Metro Mate`.
+9. Add the small or medium DC Metro Mate widget.
+10. Confirm the widget shows the selected station and last snapshot.
 
 To inspect the generated native target locally:
 
 ```sh
-APPLE_TEAM_ID=YOUR_TEAM_ID npx expo prebuild --platform ios --clean
+npx expo prebuild --platform ios --clean
 ```
 
 This generates an ignored `ios/` directory. The widget source remains tracked under `targets/metrolens-widget/`.

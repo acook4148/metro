@@ -23,7 +23,7 @@ const appEnv = process.env.APP_ENV || 'development';
 const variant = variants[appEnv] || variants.development;
 const slug = 'metrolens-dev';
 const appGroupIdentifier = 'group.app.metrolens.mobile';
-const appleTeamId = process.env.APPLE_TEAM_ID;
+const appleTeamId = process.env.APPLE_TEAM_ID || 'R6JUM7R433';
 
 module.exports = {
   expo: {
@@ -31,14 +31,14 @@ module.exports = {
     slug,
     version: '0.1.0',
     orientation: 'portrait',
-    icon: './assets/logo.png',
+    icon: './assets/app-icon.png',
     userInterfaceStyle: 'automatic',
     scheme: variant.scheme,
     newArchEnabled: true,
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: variant.bundleIdentifier,
-      ...(appleTeamId ? { appleTeamId } : {}),
+      appleTeamId,
       entitlements: {
         'com.apple.security.application-groups': [appGroupIdentifier],
       },

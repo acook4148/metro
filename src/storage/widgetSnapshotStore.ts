@@ -20,6 +20,8 @@ export type StationWidgetSnapshot = {
   alertCount: number;
   fetchedAt: string | null;
   generatedAt: string;
+  isClosed?: boolean;
+  nextTrainTime?: string | null;
   isRefreshing?: boolean;
 };
 
@@ -80,6 +82,10 @@ function isStationWidgetSnapshot(value: unknown): value is StationWidgetSnapshot
     Array.isArray(snapshot.predictions) &&
     typeof snapshot.alertCount === 'number' &&
     typeof snapshot.generatedAt === 'string' &&
+    (snapshot.isClosed === undefined || typeof snapshot.isClosed === 'boolean') &&
+    (snapshot.nextTrainTime === undefined ||
+      snapshot.nextTrainTime === null ||
+      typeof snapshot.nextTrainTime === 'string') &&
     (snapshot.isRefreshing === undefined || typeof snapshot.isRefreshing === 'boolean')
   );
 }

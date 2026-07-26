@@ -1,4 +1,8 @@
 import http from 'node:http';
+import {
+  getStationOperatingStatus,
+  unavailableStationOperatingStatus,
+} from '../shared/stationSchedule.mjs';
 
 const PORT = Number.parseInt(process.env.PORT || '8787', 10);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -108,11 +112,20 @@ const server = http.createServer(async (request, response) => {
     const predictionMatch = url.pathname.match(/^\/v1\/stations\/([A-Z]\d{2})\/predictions$/);
     if (predictionMatch) {
       const stationCode = predictionMatch[1];
-      const data = await fetchWmata(
-        `/StationPrediction.svc/json/GetPrediction/${stationCode}`,
-        new URLSearchParams(),
-        15,
-      );
+      const [data, stationTimesData] = await Promise.all([
+        fetchWmata(
+          `/StationPrediction.svc/json/GetPrediction/${stationCode}`,
+          new URLSearchParams(),
+          15,
+        ),
+        fetchWmata(
+          '/Rail.svc/json/jStationTimes',
+          new URLSearchParams({ StationCode: stationCode }),
+          86400,
+        ).catch(() => null),
+      ]);
+      const stationTimes = stationTimesData?.StationTimes?.find((station) => station.Code === stationCode)
+        || stationTimesData?.StationTimes?.[0];
 
       sendJson(response, 200, {
         stationCode,
@@ -127,6 +140,9 @@ const server = http.createServer(async (request, response) => {
           minutes: normalizeMinutes(train.Min),
           rawMinutes: train.Min || null,
         })),
+        stationStatus: stationTimes
+          ? getStationOperatingStatus(stationTimes)
+          : unavailableStationOperatingStatus(),
         fetchedAt: new Date().toISOString(),
       });
       return;
@@ -186,10 +202,12 @@ function normalizeMinutes(value) {
 
 function parseLinesAffected(value) {
   if (!value) return [];
-  return value
-    .split(/[;,]/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  return Array.from(new Set(
+    value
+      .split(/[;,]/)
+      .map((line) => line.trim().toUpperCase())
+      .filter(Boolean),
+  ));
 }
 
 function sendJson(response, statusCode, body) {
