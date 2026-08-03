@@ -456,54 +456,59 @@ struct MetroLensWidgetView: View {
 
     private func homeScreenContent(_ snapshot: StationWidgetSnapshot) -> some View {
         VStack(alignment: .leading, spacing: contentSpacing) {
-            VStack(spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(displayStationName(snapshot))
-                        .font(WidgetFont.medium(titleSize))
+            VStack(alignment: .leading, spacing: contentSpacing) {
+                VStack(spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(displayStationName(snapshot))
+                            .font(WidgetFont.medium(titleSize))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Spacer(minLength: 4)
+
+                        if family == .systemMedium {
+                            refreshStatus(snapshot)
+                        }
+                    }
+
+                    Rectangle()
+                        .fill(secondaryText.opacity(0.28))
+                        .frame(height: 0.5)
+                }
+
+                if snapshot.predictions.isEmpty && snapshot.isClosed == true {
+                    Text(closedStatusLabel(snapshot))
+                        .font(WidgetFont.medium(rowTextSize))
                         .foregroundColor(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Spacer(minLength: 4)
-
-                    if family == .systemMedium {
-                        refreshStatus(snapshot)
-                    }
-                }
-
-                Rectangle()
-                    .fill(secondaryText.opacity(0.28))
-                    .frame(height: 0.5)
-            }
-
-            if snapshot.predictions.isEmpty && snapshot.isClosed == true {
-                Text(closedStatusLabel(snapshot))
-                    .font(WidgetFont.medium(rowTextSize))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .minimumScaleFactor(1)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                VStack(spacing: rowSpacing) {
-                    ForEach(Array(snapshot.predictions.prefix(predictionLimit).enumerated()), id: \.offset) { _, prediction in
-                        predictionRow(prediction)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    VStack(spacing: rowSpacing) {
+                        ForEach(Array(snapshot.predictions.prefix(predictionLimit).enumerated()), id: \.offset) { _, prediction in
+                            predictionRow(prediction)
+                        }
                     }
                 }
             }
+            .offset(y: mainContentVerticalOffset)
 
             Spacer(minLength: 0)
-
-            if family == .systemSmall {
-                refreshStatus(snapshot)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, 6)
-            }
         }
-        .padding(.horizontal, horizontalPadding)
+        .padding(.leading, leadingPadding)
+        .padding(.trailing, trailingPadding)
         .padding(.top, topPadding)
         .padding(.bottom, bottomPadding)
+        .overlay(alignment: .bottomTrailing) {
+            if family == .systemSmall {
+                refreshStatus(snapshot)
+                    .padding(.trailing, 19)
+                    .padding(.bottom, 9)
+            }
+        }
         .dynamicTypeSize(.medium)
     }
 
@@ -642,11 +647,11 @@ struct MetroLensWidgetView: View {
     }
 
     private var refreshIconSize: CGFloat {
-        family == .systemMedium ? 15 : 14
+        family == .systemMedium ? 15 : 11
     }
 
     private var rowSpacing: CGFloat {
-        family == .systemMedium ? 4 : 3
+        family == .systemMedium ? 4 : 2
     }
 
     private var rowTextSize: CGFloat {
@@ -661,16 +666,24 @@ struct MetroLensWidgetView: View {
         family == .systemMedium ? 28 : 24
     }
 
-    private var horizontalPadding: CGFloat {
+    private var leadingPadding: CGFloat {
+        15
+    }
+
+    private var trailingPadding: CGFloat {
         13
     }
 
     private var topPadding: CGFloat {
-        10
+        family == .systemMedium ? 10 : 14
     }
 
     private var bottomPadding: CGFloat {
-        8
+        family == .systemMedium ? 8 : 6
+    }
+
+    private var mainContentVerticalOffset: CGFloat {
+        family == .systemMedium ? 2 : -4
     }
 
     private var rowMinHeight: CGFloat {

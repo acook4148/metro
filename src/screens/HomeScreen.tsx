@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Image,
   Keyboard,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -47,6 +48,8 @@ import {
 import { colors, fonts, lineColors, shadow } from '../theme';
 
 const DEFAULT_STATION_CODE = 'A01';
+const PRIVACY_POLICY_URL = 'https://metrolens.pages.dev/privacy-policy/';
+const SUPPORT_URL = 'https://metrolens.pages.dev/support/';
 
 type StationGroup = {
   code: string;
@@ -343,9 +346,6 @@ export function HomeScreen() {
                   <Text numberOfLines={1} style={styles.stationName}>
                     {station.name}
                   </Text>
-                  <Text numberOfLines={1} style={styles.stationCode}>
-                    {formatStationCodes(station.stationCodes)}
-                  </Text>
                 </View>
                 <View style={styles.lineRow}>
                   {station.lines.slice(0, 4).map((line) => (
@@ -491,6 +491,26 @@ export function HomeScreen() {
             </Text>
           ) : null}
         </Pressable>
+        <View style={styles.footerLinks}>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Open DC Metro Mate support"
+            hitSlop={12}
+            onPress={() => void Linking.openURL(SUPPORT_URL)}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <Text style={styles.footerLink}>Support</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Open the DC Metro Mate privacy policy"
+            hitSlop={12}
+            onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <Text style={styles.footerLink}>Privacy Policy</Text>
+          </Pressable>
+        </View>
       </ScrollView>
 
       <Modal
@@ -681,10 +701,6 @@ function isPresent<T>(value: T | null | undefined): value is T {
   return value != null;
 }
 
-function formatStationCodes(stationCodes: string[]): string {
-  return stationCodes.join(' / ');
-}
-
 function getLatestFetchedAt(fetchedAtValues: string[]): string | null {
   if (fetchedAtValues.length === 0) return null;
 
@@ -795,7 +811,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 58,
+    minHeight: 52,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
@@ -812,12 +828,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
     ...fonts.bold,
-  },
-  stationCode: {
-    color: colors.inkMuted,
-    fontSize: 12,
-    ...fonts.medium,
-    marginTop: 3,
   },
   lineRow: {
     flexDirection: 'row',
@@ -1011,6 +1021,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 14,
   },
+  footerLinks: {
+    flexDirection: 'row',
+    gap: 24,
+    justifyContent: 'center',
+    paddingBottom: 8,
+    paddingTop: 24,
+  },
+  footerLink: {
+    color: colors.inkMuted,
+    fontSize: 13,
+    ...fonts.medium,
+    textDecorationLine: 'underline',
+  },
   modalBackdrop: {
     alignItems: 'center',
     backgroundColor: 'rgba(17, 24, 32, 0.52)',
@@ -1073,7 +1096,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   alertDetail: {
-    paddingVertical: 14,
+    paddingBottom: 14,
+    paddingTop: 6,
   },
   alertDetailDivider: {
     borderTopColor: colors.border,
