@@ -63,6 +63,8 @@ type CombinedStationStatus = {
   nextTrainTime: string | null;
 };
 
+type HomeLoadMode = 'initial' | 'pull' | 'button';
+
 export function HomeScreen() {
   const [stations, setStations] = useState<MetroStation[]>([]);
   const [incidents, setIncidents] = useState<ServiceIncident[]>([]);
@@ -78,6 +80,7 @@ export function HomeScreen() {
   const [linePreferences, setLinePreferences] = useState<LinePreferenceSnapshot>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isStationRefreshing, setIsStationRefreshing] = useState(false);
   const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,11 +155,14 @@ export function HomeScreen() {
 
   const loadHome = useCallback(async (
     stationCodes: string | string[],
-    refreshing = false,
+    mode: HomeLoadMode = 'initial',
     activeLinePreferences: LinePreferenceSnapshot = {},
+    activeStationUsage: StationUsageSnapshot = {},
   ) => {
-    if (refreshing) {
+    if (mode === 'pull') {
       setIsRefreshing(true);
+    } else if (mode === 'button') {
+      setIsStationRefreshing(true);
     } else {
       setIsLoading(true);
     }
@@ -207,6 +213,11 @@ export function HomeScreen() {
           isClosed: nextStationStatus.isClosed,
           nextTrainTime: nextStationStatus.nextTrainTime,
           isRefreshing: false,
+          topStations: createWidgetStationOptions(
+            resolvedStationGroups,
+            activeStationUsage,
+            activeLinePreferences,
+          ),
         });
       }
     } catch (loadError) {
@@ -214,6 +225,7 @@ export function HomeScreen() {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      setIsStationRefreshing(false);
     }
   }, []);
 
@@ -228,7 +240,7 @@ export function HomeScreen() {
         setStationUsage(storedUsage);
         setLinePreferences(storedLinePreferences);
         setSelectedStationCode(defaultStationCode);
-        loadHome(defaultStationCode, false, storedLinePreferences);
+        loadHome(defaultStationCode, 'initial', storedLinePreferences, storedUsage);
       });
     }, 0);
 
@@ -242,8 +254,12 @@ export function HomeScreen() {
     Keyboard.dismiss();
     setSelectedStationCode(station.code);
     setQuery('');
-    loadHome(station.stationCodes, false, linePreferences);
-    incrementStationUsage(station.stationCodes).then(setStationUsage).catch(() => undefined);
+    incrementStationUsage(station.stationCodes)
+      .then((nextStationUsage) => {
+        setStationUsage(nextStationUsage);
+        loadHome(station.stationCodes, 'initial', linePreferences, nextStationUsage);
+      })
+      .catch(() => loadHome(station.stationCodes, 'initial', linePreferences, stationUsage));
   }
 
   function selectPreferredLine(line: string) {
@@ -273,6 +289,7 @@ export function HomeScreen() {
       isClosed: stationStatus.isClosed,
       nextTrainTime: stationStatus.nextTrainTime,
       isRefreshing: false,
+      topStations: createWidgetStationOptions(stationGroups, stationUsage, nextLinePreferences),
     });
   }
 
@@ -302,7 +319,12 @@ export function HomeScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             tintColor={colors.brand}
-            onRefresh={() => loadHome(selectedStation?.stationCodes || selectedStationCode, true, linePreferences)}
+            onRefresh={() => loadHome(
+              selectedStation?.stationCodes || selectedStationCode,
+              'pull',
+              linePreferences,
+              stationUsage,
+            )}
           />
         }
       >
@@ -367,10 +389,19 @@ export function HomeScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
-              onPress={() => loadHome(selectedStation?.stationCodes || selectedStationCode, true, linePreferences)}
+              accessibilityState={{ busy: isStationRefreshing, disabled: isStationRefreshing }}
+              disabled={isStationRefreshing}
+              onPress={() => loadHome(
+                selectedStation?.stationCodes || selectedStationCode,
+                'button',
+                linePreferences,
+                stationUsage,
+              )}
               style={({ pressed }) => [styles.refreshButton, pressed && styles.pressed]}
             >
-              <Text style={styles.refreshButtonText}>Refresh</Text>
+              <Text style={styles.refreshButtonText}>
+                {isStationRefreshing ? 'Refreshing' : 'Refresh'}
+              </Text>
             </Pressable>
           </View>
 
@@ -442,9 +473,6 @@ export function HomeScreen() {
                     <Text style={styles.predictionGroupTitle}>
                       {METRO_LINE_NAMES[group.line] || `${group.line} Line`}
                     </Text>
-                    <Text style={styles.predictionGroupCount}>
-                      {group.predictions.length}
-                    </Text>
                   </View>
 
                   <View style={styles.predictionGroupRows}>
@@ -501,6 +529,7 @@ export function HomeScreen() {
           >
             <Text style={styles.footerLink}>Support</Text>
           </Pressable>
+          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.footerSeparator} />
           <Pressable
             accessibilityRole="link"
             accessibilityLabel="Open the DC Metro Mate privacy policy"
@@ -644,6 +673,24 @@ function getTopStationGroups(
       return stationA.name.localeCompare(stationB.name);
     })
     .slice(0, limit);
+}
+
+function createWidgetStationOptions(
+  stationGroups: StationGroup[],
+  stationUsage: StationUsageSnapshot,
+  linePreferences: LinePreferenceSnapshot,
+) {
+  return getTopStationGroups(stationGroups, stationUsage, 3).map((station) => {
+    const preferredLine = linePreferences[getCanonicalStationCode(station.stationCodes)] || null;
+
+    return {
+      stationCode: station.code,
+      stationCodes: station.stationCodes,
+      stationName: station.name,
+      lines: sortLines(station.lines, preferredLine),
+      preferredLineOrder: getPreferredLineOrder(preferredLine),
+    };
+  });
 }
 
 function find(parent: Map<string, string>, code: string): string {
@@ -979,11 +1026,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     marginLeft: 8,
   },
-  predictionGroupCount: {
-    color: colors.inkMuted,
-    fontSize: 12,
-    ...fonts.medium,
-  },
   predictionGroupRows: {
     gap: 8,
   },
@@ -1022,11 +1064,18 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   footerLinks: {
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 24,
+    gap: 12,
     justifyContent: 'center',
     paddingBottom: 8,
     paddingTop: 24,
+  },
+  footerSeparator: {
+    backgroundColor: colors.inkSubtle,
+    borderRadius: 2,
+    height: 3,
+    width: 3,
   },
   footerLink: {
     color: colors.inkMuted,

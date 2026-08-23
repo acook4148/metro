@@ -115,6 +115,14 @@ struct WidgetPrediction: Codable, Hashable {
     let rawMinutes: String?
 }
 
+struct WidgetStationOption: Codable, Hashable {
+    let stationCode: String
+    let stationCodes: [String]
+    let stationName: String
+    let lines: [String]
+    let preferredLineOrder: [String]
+}
+
 enum PredictionMinutes: Codable, Hashable {
     case number(Int)
     case text(String)
@@ -173,6 +181,7 @@ struct StationWidgetSnapshot: Codable {
     let isClosed: Bool?
     let nextTrainTime: String?
     let isRefreshing: Bool?
+    let topStations: [WidgetStationOption]?
 }
 
 private struct PredictionsResponse: Decodable {
@@ -257,7 +266,8 @@ private enum MetroLensWidgetRefreshService {
             nextTrainTime: stationStatus.isClosed == nil
                 ? snapshot.nextTrainTime
                 : stationStatus.nextTrainTime,
-            isRefreshing: false
+            isRefreshing: false,
+            topStations: snapshot.topStations
         )
     }
 
@@ -388,6 +398,38 @@ struct RefreshMetroLensWidgetIntent: AppIntent {
     }
 }
 
+@available(iOSApplicationExtension 17.0, *)
+struct NextMetroLensWidgetStationIntent: AppIntent {
+    static var title: LocalizedStringResource = "Show Next DC Metro Station"
+    static var description = IntentDescription("Shows arrivals for the next frequently selected station.")
+    static var openAppWhenRun = false
+
+    func perform() async -> some IntentResult {
+        defer {
+            WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
+        }
+
+        guard
+            let snapshot = WidgetSnapshotStore.load(),
+            let nextStation = snapshot.nextStationOption
+        else {
+            return .result()
+        }
+
+        let switchingSnapshot = snapshot.switching(to: nextStation)
+        try? WidgetSnapshotStore.save(switchingSnapshot)
+        WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
+
+        if let refreshedSnapshot = try? await MetroLensWidgetRefreshService.refresh(switchingSnapshot) {
+            try? WidgetSnapshotStore.save(refreshedSnapshot)
+        } else {
+            try? WidgetSnapshotStore.save(snapshot.withRefreshState(false))
+        }
+
+        return .result()
+    }
+}
+
 struct MetroLensEntry: TimelineEntry {
     let date: Date
     let snapshot: StationWidgetSnapshot?
@@ -470,6 +512,7 @@ struct MetroLensWidgetView: View {
                         Spacer(minLength: 4)
 
                         if family == .systemMedium {
+                            nextStationControl(snapshot)
                             refreshStatus(snapshot)
                         }
                     }
@@ -502,9 +545,15 @@ struct MetroLensWidgetView: View {
         .padding(.trailing, trailingPadding)
         .padding(.top, topPadding)
         .padding(.bottom, bottomPadding)
-        .overlay(alignment: .bottomTrailing) {
+        .overlay(alignment: .bottom) {
             if family == .systemSmall {
-                refreshStatus(snapshot)
+                HStack(spacing: 8) {
+                    nextStationControl(snapshot)
+                    Spacer(minLength: 8)
+                    refreshStatus(snapshot)
+                }
+                    .frame(maxWidth: .infinity)
+                    .padding(.leading, 15)
                     .padding(.trailing, 19)
                     .padding(.bottom, 9)
             }
@@ -721,6 +770,24 @@ struct MetroLensWidgetView: View {
     }
 
     @ViewBuilder
+    private func nextStationControl(_ snapshot: StationWidgetSnapshot) -> some View {
+        if (snapshot.topStations?.count ?? 0) > 1 {
+            Button(intent: NextMetroLensWidgetStationIntent()) {
+                HStack(spacing: 2) {
+                    Text("Next")
+                    Image(systemName: "chevron.right")
+                }
+                .font(WidgetFont.medium(family == .systemMedium ? 10 : 9))
+                .foregroundColor(secondaryText)
+                .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .disabled(snapshot.isRefreshing == true)
+            .accessibilityLabel("Show next frequent station")
+        }
+    }
+
+    @ViewBuilder
     private func refreshControl(_ snapshot: StationWidgetSnapshot) -> some View {
         if snapshot.isRefreshing == true {
             ProgressView()
@@ -911,7 +978,23 @@ private extension StationWidgetSnapshot {
         generatedAt: WidgetDateParser.string(from: Date()),
         isClosed: false,
         nextTrainTime: nil,
-        isRefreshing: false
+        isRefreshing: false,
+        topStations: [
+            WidgetStationOption(
+                stationCode: "A01",
+                stationCodes: ["A01", "C01"],
+                stationName: "Metro Center",
+                lines: ["RD", "BL", "OR", "SV"],
+                preferredLineOrder: ["RD", "OR", "SV", "BL", "YL", "GR"]
+            ),
+            WidgetStationOption(
+                stationCode: "B01",
+                stationCodes: ["B01", "F01"],
+                stationName: "Gallery Pl-Chinatown",
+                lines: ["RD", "YL", "GR"],
+                preferredLineOrder: ["RD", "YL", "GR", "OR", "SV", "BL"]
+            )
+        ]
     )
 }
 
@@ -929,7 +1012,38 @@ private extension StationWidgetSnapshot {
             generatedAt: generatedAt,
             isClosed: isClosed,
             nextTrainTime: nextTrainTime,
-            isRefreshing: isRefreshing
+            isRefreshing: isRefreshing,
+            topStations: topStations
+        )
+    }
+
+    var nextStationOption: WidgetStationOption? {
+        guard let topStations, topStations.count > 1 else {
+            return nil
+        }
+
+        let currentIndex = topStations.firstIndex { station in
+            station.stationCode == stationCode || station.stationCodes.contains(stationCode)
+        }
+        let nextIndex = currentIndex.map { ($0 + 1) % topStations.count } ?? 0
+        return topStations[nextIndex]
+    }
+
+    func switching(to station: WidgetStationOption) -> StationWidgetSnapshot {
+        StationWidgetSnapshot(
+            stationCode: station.stationCode,
+            stationCodes: station.stationCodes,
+            stationName: station.stationName,
+            lines: station.lines,
+            preferredLineOrder: station.preferredLineOrder,
+            predictions: [],
+            alertCount: alertCount,
+            fetchedAt: nil,
+            generatedAt: WidgetDateParser.string(from: Date()),
+            isClosed: nil,
+            nextTrainTime: nil,
+            isRefreshing: true,
+            topStations: topStations
         )
     }
 }

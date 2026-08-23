@@ -30,6 +30,12 @@ Current snapshot contents:
 - Active alert count.
 - WMATA fetch timestamp.
 - Local snapshot generation timestamp.
+- Up to three most frequently selected stations, using the same ranking shown in the app.
+- Each frequent station's grouped station codes, served lines, and preferred line order.
+
+On iOS 17+, the small and medium Home Screen widgets show a `Next` control when at least two
+frequent stations are available. The control cycles through the ranked stations, fetches fresh
+arrivals through the existing Cloudflare API, and reloads the widget without opening the app.
 
 ## Important Constraint
 
@@ -83,6 +89,8 @@ npx eas-cli build --profile development --platform ios
 8. Search for `DC Metro Mate`.
 9. Add the small or medium DC Metro Mate widget.
 10. Confirm the widget shows the selected station and last snapshot.
+11. Select at least two stations in the app, reopen or refresh the app, then tap `Next` in the
+    Home Screen widget and confirm it cycles through the app's top stations.
 
 To inspect the generated native target locally:
 

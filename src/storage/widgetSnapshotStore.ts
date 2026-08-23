@@ -10,6 +10,14 @@ export type WidgetPrediction = {
   rawMinutes: string | null;
 };
 
+export type WidgetStationOption = {
+  stationCode: string;
+  stationCodes: string[];
+  stationName: string;
+  lines: string[];
+  preferredLineOrder: string[];
+};
+
 export type StationWidgetSnapshot = {
   stationCode: string;
   stationCodes: string[];
@@ -23,6 +31,7 @@ export type StationWidgetSnapshot = {
   isClosed?: boolean;
   nextTrainTime?: string | null;
   isRefreshing?: boolean;
+  topStations?: WidgetStationOption[];
 };
 
 const snapshotFile = new File(Paths.document, 'station-widget-snapshot.json');
@@ -86,7 +95,25 @@ function isStationWidgetSnapshot(value: unknown): value is StationWidgetSnapshot
     (snapshot.nextTrainTime === undefined ||
       snapshot.nextTrainTime === null ||
       typeof snapshot.nextTrainTime === 'string') &&
-    (snapshot.isRefreshing === undefined || typeof snapshot.isRefreshing === 'boolean')
+    (snapshot.isRefreshing === undefined || typeof snapshot.isRefreshing === 'boolean') &&
+    (snapshot.topStations === undefined ||
+      (Array.isArray(snapshot.topStations) && snapshot.topStations.every(isWidgetStationOption)))
+  );
+}
+
+function isWidgetStationOption(value: unknown): value is WidgetStationOption {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  const station = value as Partial<WidgetStationOption>;
+  return (
+    typeof station.stationCode === 'string' &&
+    Array.isArray(station.stationCodes) &&
+    station.stationCodes.every((code) => typeof code === 'string') &&
+    typeof station.stationName === 'string' &&
+    Array.isArray(station.lines) &&
+    station.lines.every((line) => typeof line === 'string') &&
+    Array.isArray(station.preferredLineOrder) &&
+    station.preferredLineOrder.every((line) => typeof line === 'string')
   );
 }
 

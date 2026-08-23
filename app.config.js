@@ -29,7 +29,7 @@ module.exports = {
   expo: {
     name: variant.name,
     slug,
-    version: '0.1.0',
+    version: '0.1.2',
     orientation: 'portrait',
     icon: './assets/app-icon.png',
     userInterfaceStyle: 'automatic',
@@ -42,6 +42,9 @@ module.exports = {
       entitlements: {
         'com.apple.security.application-groups': [appGroupIdentifier],
       },
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false
+      }
     },
     android: {
       package: variant.packageName,
