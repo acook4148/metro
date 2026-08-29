@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import * as WebBrowser from 'expo-web-browser';
 import {
   ActivityIndicator,
   Image,
@@ -48,6 +50,7 @@ import {
 import { colors, fonts, lineColors, shadow } from '../theme';
 
 const DEFAULT_STATION_CODE = 'A01';
+const FEEDBACK_BOARD_URL = 'https://simplefeatureboard.com/b/dc-metro-mate';
 const PRIVACY_POLICY_URL = 'https://metrolens.pages.dev/privacy-policy/';
 const SUPPORT_URL = 'https://metrolens.pages.dev/support/';
 
@@ -335,6 +338,20 @@ export function HomeScreen() {
             source={require('../../assets/logo-transparent.png')}
             style={styles.logo}
           />
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Open DC Metro Mate feedback board"
+            hitSlop={8}
+            onPress={() => void openFeedbackBoard()}
+            style={({ pressed }) => [styles.feedbackButton, pressed && styles.pressed]}
+          >
+            <View accessibilityElementsHidden style={styles.feedbackIcon}>
+              <Ionicons color={colors.surface} name="chatbox-outline" size={28} />
+              <View style={styles.feedbackIconPlus}>
+                <Ionicons color={colors.surface} name="add" size={14} />
+              </View>
+            </View>
+          </Pressable>
         </View>
 
         <View style={styles.searchPanel}>
@@ -791,6 +808,18 @@ function getApiErrorHint(): string {
   return 'Check the deployed DC Metro Mate API, then pull down to refresh.';
 }
 
+async function openFeedbackBoard() {
+  try {
+    await WebBrowser.openBrowserAsync(FEEDBACK_BOARD_URL, {
+      controlsColor: colors.brand,
+      dismissButtonStyle: 'done',
+      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+    });
+  } catch {
+    await Linking.openURL(FEEDBACK_BOARD_URL);
+  }
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -814,11 +843,40 @@ const styles = StyleSheet.create({
   },
   topBar: {
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
+    minHeight: 120,
+    position: 'relative',
+    width: '100%',
   },
   logo: {
     height: 120,
     width: 196,
+  },
+  feedbackButton: {
+    alignItems: 'center',
+    backgroundColor: colors.brand,
+    borderRadius: 8,
+    height: 46,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    top: 8,
+    width: 46,
+  },
+  feedbackIcon: {
+    height: 28,
+    position: 'relative',
+    width: 28,
+  },
+  feedbackIconPlus: {
+    alignItems: 'center',
+    height: 22,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    top: 1,
+    width: 28,
   },
   searchPanel: {
     backgroundColor: colors.surface,

@@ -622,6 +622,8 @@ struct MetroLensWidgetView: View {
 
                     Spacer(minLength: 2)
 
+                    accessoryNextStationControl(snapshot)
+
                     Text(ageLabel(snapshot))
                         .font(WidgetFont.medium(10))
                         .monospacedDigit()
@@ -822,6 +824,20 @@ struct MetroLensWidgetView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Refresh arrivals")
+        }
+    }
+
+    @ViewBuilder
+    private func accessoryNextStationControl(_ snapshot: StationWidgetSnapshot) -> some View {
+        if (snapshot.topStations?.count ?? 0) > 1 {
+            Button(intent: NextMetroLensWidgetStationIntent()) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.plain)
+            .disabled(snapshot.isRefreshing == true)
+            .accessibilityLabel("Show next frequent station")
         }
     }
 
