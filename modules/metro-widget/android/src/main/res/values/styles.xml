@@ -1,0 +1,29 @@
+<resources>
+  <style name="MetroWidgetText">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:fontFamily">sans-serif-medium</item>
+    <item name="android:textColor">#FFFFFF</item>
+    <item name="android:textSize">13.5sp</item>
+    <item name="android:includeFontPadding">false</item>
+    <item name="android:maxLines">1</item>
+    <item name="android:ellipsize">end</item>
+  </style>
+  <style name="MetroWidgetTitle" parent="MetroWidgetText">
+    <item name="android:layout_width">0dp</item>
+    <item name="android:layout_weight">1</item>
+    <item name="android:textSize">16sp</item>
+    <item name="android:text">@string/metro_widget_title</item>
+  </style>
+  <style name="MetroWidgetControlText" parent="MetroWidgetText">
+    <item name="android:textSize">11sp</item>
+    <item name="android:textColor">#C9C9C4</item>
+  </style>
+  <style name="MetroWidgetControl">
+    <item name="android:layout_width">32dp</item>
+    <item name="android:layout_height">32dp</item>
+    <item name="android:padding">8dp</item>
+    <item name="android:background">@android:color/transparent</item>
+    <item name="android:tint">#C9C9C4</item>
+  </style>
+</resources>

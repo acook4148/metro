@@ -1,0 +1,9 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:minWidth="160dp" android:minHeight="170dp"
+  android:minResizeWidth="130dp" android:minResizeHeight="110dp"
+  android:targetCellWidth="2" android:targetCellHeight="2"
+  android:initialLayout="@layout/metro_widget_compact"
+  android:previewLayout="@layout/metro_widget_compact"
+  android:description="@string/metro_widget_description"
+  android:resizeMode="horizontal|vertical" android:updatePeriodMillis="0"
+  android:widgetCategory="home_screen|keyguard" />

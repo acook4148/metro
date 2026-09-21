@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.metrowidget'
+version = '1.0.0'
+
+android {
+  namespace 'expo.modules.metrowidget'
+  defaultConfig {
+    minSdkVersion 26
+  }
+}
+
+dependencies {
+  implementation 'androidx.work:work-runtime-ktx:2.10.1'
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.json:json:20240303'
+}

@@ -4,8 +4,10 @@ dist/
 web-build/
 
 # Native build output and generated projects
-ios/
-android/
+/ios/
+/android/
+modules/**/build/
+modules/**/.gradle/
 
 # Local environment
 .env

@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+
+const fontFamily = Platform.OS === 'android' ? 'sans-serif' : 'Helvetica Neue';
+
 export const colors = {
   background: '#F4F6F3',
   surface: '#FFFFFF',
@@ -32,11 +36,11 @@ export const shadow = {
 
 export const fonts = {
   medium: {
-    fontFamily: 'Helvetica Neue',
+    fontFamily,
     fontWeight: '500' as const,
   },
   bold: {
-    fontFamily: 'Helvetica Neue',
+    fontFamily,
     fontWeight: '700' as const,
   },
 };
