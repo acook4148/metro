@@ -108,6 +108,35 @@ Before releasing Android, check on a physical device:
 - Long service alerts, scrolling, and closing the modal with Android Back.
 - Feedback opening in a browser custom tab, plus Support and Privacy links.
 - Launcher icon, large system font settings, and narrow screen layouts.
+- Map opening/closing with Android Back, station taps after zooming, and pinch-to-drag
+  transitions when lifting either finger first. Confirm the map selection updates widgets.
+
+### Android Integration Audit (October 28, 2026)
+
+Merged `origin/main` into `feat/android-app-compatibility`, including the interactive
+map and home-screen controls. The map uses the shared platform font, native Android
+gesture handling, and Android Back dismissal. Android touch tracking uses the average
+pointer position to match iOS. Existing search clearing, safe-area handling, persisted
+preferences, browser feedback, and native widget synchronization remain in place.
+
+Release verification still requires a native preview APK: this workstation has no
+Android SDK/emulator, so Kotlin compilation, widget instrumentation, navigation-bar
+layout, and physical multi-touch behavior have not been verified here. Expo Go cannot
+test widgets. Run the preview build above before producing a Play release bundle.
+
+Existing choices retained: Android 8+ minimum, Roboto medium/bold, Compact/Wide widgets,
+and 30-minute scheduled widget refresh with manual refresh. Lock-screen availability
+depends on the device host. Confirm `app.metrolens.mobile` is the intended permanent
+Play package identifier and obtain permission for the bundled WMATA map before release.
+
+Validation: Android production JavaScript export, Android prebuild in a temporary copy,
+widget-module autolinking, TypeScript, lint, and the ten map tests passed. These are not
+a substitute for compiling the APK or running the Kotlin widget tests.
+
+Appearance decision: configuration currently requests `automatic`, but Android prebuild
+warns that `expo-system-ui` is missing. The actual app palette is fixed light. Decide
+whether to explicitly support light-only native appearance or implement a complete dark
+theme before changing this setting; the audit does not claim dark-mode support.
 
 ### Android Widgets
 
@@ -124,7 +153,8 @@ app is closed, using the existing public Cloudflare API without embedding a WMAT
 
 Refresh shows a spinner while requesting new data. Failed requests retain the previous
 station and arrivals, color the age timer orange, and show Retry when space permits.
-The age timer counts elapsed time as `MM:SS` (or `H:MM:SS`); it does not make network calls.
+The update label shows the last successful data timestamp in the device's local time
+format. It stays fixed until newer data arrives; it is not a ticking stopwatch.
 Android WorkManager requests background refresh every 30 minutes while widgets exist.
 Battery saving and network availability can delay these updates. Button presses request
 an immediate update. Removing the last widget cancels scheduled refresh work.

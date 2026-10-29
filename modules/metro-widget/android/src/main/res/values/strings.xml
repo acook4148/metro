@@ -10,7 +10,8 @@
   <string name="metro_widget_refreshing">Refreshing arrivals</string>
   <string name="metro_widget_failed">Refresh failed. Showing saved arrivals.</string>
   <string name="metro_widget_retry">Retry</string>
-  <string name="metro_widget_age">Time since arrivals were updated</string>
+  <string name="metro_widget_age">Last updated time</string>
+  <string name="metro_widget_updated_at">Arrivals updated at %1$s</string>
   <string name="metro_widget_no_trains">No trains predicted</string>
   <string name="metro_widget_closed">Closed</string>
   <string name="metro_widget_next_train">Closed. Next train at %1$s</string>

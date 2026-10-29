@@ -22,19 +22,23 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Worker(c
     if (WidgetRenderer.ids(applicationContext).isEmpty()) return Result.success()
     val request = WidgetStore.begin(applicationContext, inputData.getBoolean("next", false), id.toString(), inputData.getString("revision"))
       ?: return Result.success()
-    WidgetRenderer.updateAll(applicationContext)
-    val result = runCatching {
-      val codes = WidgetData.strings(request.snapshot.optJSONArray("stationCodes"))
-        .ifEmpty { listOf(request.snapshot.getString("stationCode")) }.distinct().take(4)
-      val responses = codes.map { code ->
-        val normalized = code.uppercase(Locale.ROOT)
-        require(normalized.matches(Regex("[A-Z][0-9]{2}")))
-        fetch("/v1/stations/$normalized/predictions")
-      }
-      WidgetData.merge(request.snapshot, responses)
-    }.getOrNull()
-    WidgetStore.finish(applicationContext, request, result)
-    WidgetRenderer.updateAll(applicationContext)
+    var result: JSONObject? = null
+    try {
+      WidgetRenderer.updateAll(applicationContext)
+      result = runCatching {
+        val codes = WidgetData.strings(request.snapshot.optJSONArray("stationCodes"))
+          .ifEmpty { listOf(request.snapshot.getString("stationCode")) }.distinct().take(4)
+        val responses = codes.map { code ->
+          val normalized = code.uppercase(Locale.ROOT)
+          require(normalized.matches(Regex("[A-Z][0-9]{2}")))
+          fetch("/v1/stations/$normalized/predictions")
+        }
+        WidgetData.merge(request.snapshot, responses)
+      }.getOrNull()
+    } finally {
+      WidgetStore.finish(applicationContext, request, result)
+      WidgetRenderer.updateAll(applicationContext)
+    }
     return Result.success()
   }
 

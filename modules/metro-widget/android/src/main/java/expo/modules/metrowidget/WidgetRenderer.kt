@@ -8,12 +8,13 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Build
-import android.os.SystemClock
+import android.text.format.DateFormat
 import android.util.SizeF
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import java.util.Locale
+import java.util.Date
 
 internal object WidgetRenderer {
   fun ids(context: Context): IntArray {
@@ -110,6 +111,7 @@ internal object WidgetRenderer {
     views.setViewVisibility(R.id.metro_next_text, if (lockScreen || size.width < 170 * fontScale) View.GONE else View.VISIBLE)
     views.setBoolean(R.id.metro_next, "setEnabled", !state.busy)
     views.setViewVisibility(R.id.metro_refresh, if (state.busy) View.GONE else View.VISIBLE)
+    views.setProgressBar(R.id.metro_loading, 100, 0, state.busy)
     views.setViewVisibility(R.id.metro_loading, if (state.busy) View.VISIBLE else View.GONE)
     views.setOnClickPendingIntent(R.id.metro_next, action(context, MetroWidgetReceiver.ACTION_NEXT, 1))
     views.setOnClickPendingIntent(R.id.metro_refresh, action(context, MetroWidgetReceiver.ACTION_REFRESH, 2))
@@ -119,10 +121,10 @@ internal object WidgetRenderer {
     views.setContentDescription(R.id.metro_refresh, context.getString(if (state.error) R.string.metro_widget_failed else R.string.metro_widget_refresh))
     val fetchedAt = WidgetData.timestamp(snapshot.optString("fetchedAt"))
     if (fetchedAt != null) {
-      val elapsed = (System.currentTimeMillis() - fetchedAt).coerceAtLeast(0)
-      views.setChronometer(R.id.metro_age, SystemClock.elapsedRealtime() - elapsed, null, true)
+      val updated = DateFormat.getTimeFormat(context).format(Date(fetchedAt))
+      views.setTextViewText(R.id.metro_age, updated)
+      views.setContentDescription(R.id.metro_age, context.getString(R.string.metro_widget_updated_at, updated))
     } else {
-      views.setChronometer(R.id.metro_age, SystemClock.elapsedRealtime(), null, false)
       views.setTextViewText(R.id.metro_age, context.getString(R.string.metro_widget_unknown_age))
     }
     return views

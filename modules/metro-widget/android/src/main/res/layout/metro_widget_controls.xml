@@ -11,11 +11,11 @@
   <TextView android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
   <TextView android:id="@+id/metro_retry" style="@style/MetroWidgetControlText"
     android:text="@string/metro_widget_retry" android:visibility="gone" android:layout_marginEnd="4dp" />
-  <Chronometer android:id="@+id/metro_age" style="@style/MetroWidgetControlText"
-    android:maxWidth="44dp"
+  <TextView android:id="@+id/metro_age" style="@style/MetroWidgetControlText"
     android:contentDescription="@string/metro_widget_age" android:text="@string/metro_widget_unknown_age" />
   <FrameLayout android:layout_width="32dp" android:layout_height="32dp">
-    <ImageButton android:id="@+id/metro_refresh" style="@style/MetroWidgetControl"
+    <ImageView android:id="@+id/metro_refresh" style="@style/MetroWidgetControl"
+      android:scaleType="fitCenter"
       android:contentDescription="@string/metro_widget_refresh" android:src="@drawable/metro_widget_refresh" />
     <ProgressBar android:id="@+id/metro_loading" style="?android:attr/progressBarStyleSmall"
       android:layout_width="16dp" android:layout_height="16dp" android:layout_gravity="center"

@@ -66,7 +66,8 @@ function MapContent({ selectedStationCode, onClose, onSelect }: Props) {
     if (station) setFocused(station);
   }, [fit]);
 
-  const pan = Gesture.Pan().minDistance(8)
+  // Match iOS center-of-touch tracking when Android pointers change during a pinch.
+  const pan = Gesture.Pan().averageTouches(true).minDistance(8)
     .onTouchesDown(() => { panNeedsRebase.value = true; })
     .onTouchesUp(() => { panNeedsRebase.value = true; })
     .onStart((event) => {
