@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as WebBrowser from 'expo-web-browser';
 import {
@@ -26,7 +26,9 @@ import {
   TrainPrediction,
 } from '../api/metrolensApi';
 import { LineBadge } from '../components/LineBadge';
+import { MetroMapModal } from '../components/MetroMapModal';
 import { PredictionRow } from '../components/PredictionRow';
+import { stationForCode } from '../map/metroMap';
 import {
   METRO_LINE_NAMES,
   METRO_LINE_ORDER,
@@ -85,12 +87,16 @@ export function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isStationRefreshing, setIsStationRefreshing] = useState(false);
   const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
+  const [isMapVisible, setIsMapVisible] = useState(false);
+  const scrollView = useRef<ScrollView>(null);
+  const selectedStationOffset = useRef(0);
   const [error, setError] = useState<string | null>(null);
 
   const stationGroups = useMemo(() => groupStations(stations), [stations]);
 
   const selectedStation = useMemo(
-    () => stationGroups.find((station) => station.stationCodes.includes(selectedStationCode)) || null,
+    () => stationGroups.find((station) => station.stationCodes.includes(selectedStationCode))
+      || stationForCode(selectedStationCode) || null,
     [selectedStationCode, stationGroups],
   );
 
@@ -316,6 +322,7 @@ export function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
+        ref={scrollView}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -332,6 +339,15 @@ export function HomeScreen() {
         }
       >
         <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Choose a station on the Metro map"
+            hitSlop={8}
+            onPress={() => { Keyboard.dismiss(); setIsMapVisible(true); }}
+            style={({ pressed }) => [styles.headerButton, styles.mapButton, pressed && styles.pressed]}
+          >
+            <Ionicons name="map-outline" size={27} color={colors.surface} />
+          </Pressable>
           <Image
             accessibilityLabel="DC Metro Mate"
             resizeMode="contain"
@@ -343,7 +359,7 @@ export function HomeScreen() {
             accessibilityLabel="Open DC Metro Mate feedback board"
             hitSlop={8}
             onPress={() => void openFeedbackBoard()}
-            style={({ pressed }) => [styles.feedbackButton, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.headerButton, styles.feedbackButton, pressed && styles.pressed]}
           >
             <View accessibilityElementsHidden style={styles.feedbackIcon}>
               <Ionicons color={colors.surface} name="chatbox-outline" size={28} />
@@ -396,7 +412,7 @@ export function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.stationCard}>
+        <View style={styles.stationCard} onLayout={({ nativeEvent }) => { selectedStationOffset.current = nativeEvent.layout.y; }}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleGroup}>
               <Text style={styles.cardKicker}>Selected station</Text>
@@ -558,6 +574,14 @@ export function HomeScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <MetroMapModal visible={isMapVisible} selectedStationCode={selectedStationCode}
+        onClose={() => setIsMapVisible(false)}
+        onSelect={(mapStation) => {
+          setIsMapVisible(false);
+          selectStation(stationGroups.find((station) => station.stationCodes.includes(mapStation.code)) || mapStation);
+          requestAnimationFrame(() => scrollView.current?.scrollTo({ y: selectedStationOffset.current, animated: true }));
+        }} />
 
       <Modal
         animationType="fade"
@@ -839,7 +863,7 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 32,
     paddingHorizontal: 18,
-    paddingTop: 34,
+    paddingTop: 22,
   },
   topBar: {
     alignItems: 'center',
@@ -851,19 +875,21 @@ const styles = StyleSheet.create({
   },
   logo: {
     height: 120,
+    maxWidth: '60%',
     width: 196,
   },
-  feedbackButton: {
+  headerButton: {
     alignItems: 'center',
     backgroundColor: colors.brand,
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     position: 'absolute',
-    right: 0,
     top: 8,
     width: 46,
   },
+  mapButton: { left: 0 },
+  feedbackButton: { right: 0 },
   feedbackIcon: {
     height: 28,
     position: 'relative',
