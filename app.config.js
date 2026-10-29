@@ -29,7 +29,7 @@ module.exports = {
   expo: {
     name: variant.name,
     slug,
-    version: '0.1.3',
+    version: '0.1.4',
     orientation: 'portrait',
     icon: './assets/app-icon.png',
     userInterfaceStyle: 'automatic',

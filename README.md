@@ -160,3 +160,29 @@ Set `APP_ENV` to choose app identifiers and display names:
 - `production`: `app.metrolens.mobile`
 
 Copy `.env.example` to `.env.local` for local development. WMATA API keys must only be stored as Cloudflare Worker secrets and must never use an `EXPO_PUBLIC_` variable.
+
+## Interactive Station Map
+
+The Map button beside station search opens the bundled WMATA diagram, initially
+zoomed toward Metro Center with the top legend clipped. Pan or pinch to zoom.
+Tapping a station previews its name and
+lines; Show arrivals uses the same selection/history/widget flow as station search.
+Closing the map without confirming leaves the current station unchanged.
+
+The map image and 98 station targets are bundled together for offline browsing.
+Transfer stations share a marker and retain all their boarding-zone codes. Live
+arrivals still require the API. Source, coordinate maintenance, and map permission
+notes are in `assets/METRO_MAP_SOURCE.md`; confirm reproduction permission before
+distributing the official artwork.
+
+```sh
+node --test scripts/metro-map.test.cjs
+```
+
+The map adds Expo-compatible Gesture Handler, Reanimated, and Worklets dependencies.
+Existing custom development clients need a new native build. Compatible Expo Go
+versions already include these modules.
+
+Test on iOS and Android: pinch/pan without selecting by accident, select stations
+on each branch and all four multi-code transfer stations, dismiss with Close/Back,
+and verify station history and widget selection only change after Show arrivals.
