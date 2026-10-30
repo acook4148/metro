@@ -1,0 +1,25 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/metro_controls" android:layout_width="match_parent" android:layout_height="32dp"
+  android:gravity="center_vertical" android:orientation="horizontal">
+  <LinearLayout android:id="@+id/metro_next" android:layout_width="wrap_content" android:layout_height="match_parent"
+    android:gravity="center_vertical" android:orientation="horizontal"
+    android:contentDescription="@string/metro_widget_next_label">
+    <TextView android:id="@+id/metro_next_text" style="@style/MetroWidgetControlText" android:text="@string/metro_widget_next" />
+    <ImageView android:layout_width="24dp" android:layout_height="match_parent" android:padding="5dp"
+      android:src="@drawable/metro_widget_next" android:importantForAccessibility="no" />
+  </LinearLayout>
+  <TextView android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+  <TextView android:id="@+id/metro_retry" style="@style/MetroWidgetControlText"
+    android:text="@string/metro_widget_retry" android:visibility="gone" android:layout_marginEnd="4dp" />
+  <TextView android:id="@+id/metro_age" style="@style/MetroWidgetControlText"
+    android:contentDescription="@string/metro_widget_age" android:text="@string/metro_widget_unknown_age" />
+  <FrameLayout android:layout_width="32dp" android:layout_height="32dp">
+    <ImageView android:id="@+id/metro_refresh" style="@style/MetroWidgetControl"
+      android:scaleType="fitCenter"
+      android:contentDescription="@string/metro_widget_refresh" android:src="@drawable/metro_widget_refresh" />
+    <ProgressBar android:id="@+id/metro_loading" style="?android:attr/progressBarStyleSmall"
+      android:layout_width="16dp" android:layout_height="16dp" android:layout_gravity="center"
+      android:indeterminateTint="#C9C9C4" android:visibility="gone"
+      android:contentDescription="@string/metro_widget_refreshing" />
+  </FrameLayout>
+</LinearLayout>

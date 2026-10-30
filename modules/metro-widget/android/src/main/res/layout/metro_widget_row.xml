@@ -1,0 +1,12 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/metro_row" android:layout_width="match_parent" android:layout_height="wrap_content"
+  android:orientation="horizontal" android:gravity="center_vertical" android:baselineAligned="true"
+  android:paddingVertical="2dp">
+  <TextView android:id="@+id/metro_line" style="@style/MetroWidgetText"
+    android:minWidth="25dp" android:fontFamily="sans-serif" android:textStyle="bold" />
+  <TextView android:id="@+id/metro_destination" style="@style/MetroWidgetText"
+    android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="3dp" />
+  <TextView android:id="@+id/metro_minutes" style="@style/MetroWidgetText"
+    android:layout_marginStart="4dp" android:gravity="end" android:minWidth="28dp"
+    android:fontFeatureSettings="tnum" />
+</LinearLayout>

@@ -1,7 +1,7 @@
-import { ExtensionStorage } from '@bacons/apple-targets';
 import { File, Paths } from 'expo-file-system';
 
 import { TrainPrediction } from '../api/metrolensApi';
+import { syncNativeWidget } from './nativeWidgetSync';
 
 export type WidgetPrediction = {
   destinationName: string;
@@ -35,9 +35,6 @@ export type StationWidgetSnapshot = {
 };
 
 const snapshotFile = new File(Paths.document, 'station-widget-snapshot.json');
-const appGroupIdentifier = 'group.app.metrolens.mobile';
-const snapshotStorageKey = 'stationWidgetSnapshot';
-const extensionStorage = new ExtensionStorage(appGroupIdentifier);
 
 export async function readStationWidgetSnapshot(): Promise<StationWidgetSnapshot | null> {
   try {
@@ -54,8 +51,7 @@ export async function readStationWidgetSnapshot(): Promise<StationWidgetSnapshot
 export function writeStationWidgetSnapshot(snapshot: StationWidgetSnapshot) {
   const serializedSnapshot = JSON.stringify(snapshot);
   snapshotFile.write(serializedSnapshot);
-  extensionStorage.set(snapshotStorageKey, serializedSnapshot);
-  ExtensionStorage.reloadWidget('MetroLensWidget');
+  syncNativeWidget(serializedSnapshot);
 }
 
 export function createStationWidgetPredictions(

@@ -1,0 +1,15 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/metro_widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+  android:orientation="vertical" android:paddingHorizontal="15dp" android:paddingVertical="10dp"
+  android:background="@drawable/metro_widget_background">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+    <TextView android:id="@+id/metro_station" style="@style/MetroWidgetTitle" android:textSize="18sp" />
+    <include layout="@layout/metro_widget_controls" android:layout_width="wrap_content" android:layout_height="32dp" />
+  </LinearLayout>
+  <ImageView android:layout_width="match_parent" android:layout_height="0.5dp"
+    android:layout_marginTop="3dp" android:layout_marginBottom="5dp" android:background="#38C9C9C4" />
+  <TextView android:id="@+id/metro_status" style="@style/MetroWidgetText"
+    android:layout_width="match_parent" android:maxLines="3" android:text="@string/metro_widget_setup" />
+  <LinearLayout android:id="@+id/metro_rows" android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" />
+</LinearLayout>

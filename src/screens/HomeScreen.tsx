@@ -7,6 +7,7 @@ import {
   Keyboard,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -329,6 +330,7 @@ export function HomeScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             tintColor={colors.brand}
+            colors={[colors.brand]}
             onRefresh={() => loadHome(
               selectedStation?.stationCodes || selectedStationCode,
               'pull',
@@ -361,7 +363,7 @@ export function HomeScreen() {
             onPress={() => void openFeedbackBoard()}
             style={({ pressed }) => [styles.headerButton, styles.feedbackButton, pressed && styles.pressed]}
           >
-            <View accessibilityElementsHidden style={styles.feedbackIcon}>
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.feedbackIcon}>
               <Ionicons color={colors.surface} name="chatbox-outline" size={28} />
               <View style={styles.feedbackIconPlus}>
                 <Ionicons color={colors.surface} name="add" size={14} />
@@ -372,18 +374,31 @@ export function HomeScreen() {
 
         <View style={styles.searchPanel}>
           <Text style={styles.label}>Station</Text>
-          <TextInput
-            autoCapitalize="words"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            onChangeText={setQuery}
-            onSubmitEditing={Keyboard.dismiss}
-            placeholder="Search station or line"
-            placeholderTextColor={colors.inkSubtle}
-            returnKeyType="search"
-            style={styles.searchInput}
-            value={query}
-          />
+          <View style={styles.searchField}>
+            <TextInput
+              autoCapitalize="words"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              onChangeText={setQuery}
+              onSubmitEditing={Keyboard.dismiss}
+              placeholder="Search station or line"
+              placeholderTextColor={colors.inkSubtle}
+              returnKeyType="search"
+              style={[styles.searchInput, Platform.OS === 'android' && styles.androidSearchInput]}
+              underlineColorAndroid="transparent"
+              value={query}
+            />
+            {Platform.OS === 'android' && query.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear station search"
+                onPress={() => setQuery('')}
+                style={({ pressed }) => [styles.clearSearchButton, pressed && styles.pressed]}
+              >
+                <Ionicons color={colors.inkMuted} name="close-circle" size={20} />
+              </Pressable>
+            ) : null}
+          </View>
 
           <View style={styles.stationResults}>
             {filteredStations.map((station) => (
@@ -835,6 +850,7 @@ function getApiErrorHint(): string {
 async function openFeedbackBoard() {
   try {
     await WebBrowser.openBrowserAsync(FEEDBACK_BOARD_URL, {
+      toolbarColor: colors.background,
       controlsColor: colors.brand,
       dismissButtonStyle: 'done',
       presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
@@ -930,6 +946,21 @@ const styles = StyleSheet.create({
     ...fonts.medium,
     minHeight: 52,
     paddingHorizontal: 14,
+  },
+  searchField: {
+    position: 'relative',
+  },
+  androidSearchInput: {
+    paddingRight: 48,
+  },
+  clearSearchButton: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 2,
+    top: 0,
+    width: 44,
   },
   stationResults: {
     gap: 8,

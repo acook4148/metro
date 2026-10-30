@@ -48,12 +48,7 @@ module.exports = {
     },
     android: {
       package: variant.packageName,
-      adaptiveIcon: {
-        backgroundColor: '#F7F8FA',
-        foregroundImage: './assets/android-icon-foreground.png',
-        backgroundImage: './assets/android-icon-background.png',
-        monochromeImage: './assets/android-icon-monochrome.png',
-      },
+      icon: './assets/app-icon.png',
       predictiveBackGestureEnabled: false,
     },
     web: {
